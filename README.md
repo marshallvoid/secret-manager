@@ -63,10 +63,10 @@ uv run secret-manager
 
 ## GitHub
 
-- The sidebar lists, by name only:
-  - your repositories;
+- The sidebar lists, from the widest scope to the narrowest, by name only:
+  - your account's Codespaces secrets;
   - each organization: its own secrets and variables, then its repositories;
-  - your Codespaces secrets.
+  - your repositories.
 - For the chosen item, pick **Secrets** or **Variables**, then a scope.
 - Organization and Codespaces entries choose which repositories can read them.
 - Variables show their value; secrets can only be replaced, since GitHub never returns them.

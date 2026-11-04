@@ -120,22 +120,23 @@ class Sidebar(QFrame):
         if len(owners) == 1:
             self.on_select(owners[0])
 
+    # From the widest scope to the narrowest: account, organizations, then repositories
     def _sections(self) -> list[Section]:
-        own = [repo_owner(full_name=repo.full_name) for repo in self.directory.repos]
-        sections = [Section(title="YOUR REPOSITORIES", owners=own)]
+        sections = [Section(title="ACCOUNT", owners=[USER_OWNER])]
 
         for org, repos in sorted(self.directory.orgs.items()):
             org_owner = Owner(kind="org", name=org, label=org)
             members = [repo_owner(full_name=repo.full_name) for repo in repos]
             sections.append(Section(title=org.upper(), owners=[org_owner, *members]))
 
-        sections.append(Section(title="ACCOUNT", owners=[USER_OWNER]))
+        own = [repo_owner(full_name=repo.full_name) for repo in self.directory.repos]
+        sections.append(Section(title="YOUR REPOSITORIES", owners=own))
 
         # a repository opened by typing its name stays visible
         known = {owner for section in sections for owner in section.owners}
 
         if self.current is not None and self.current not in known:
-            sections.insert(0, Section(title="OPENED", owners=[self.current]))
+            sections.append(Section(title="OPENED", owners=[self.current]))
 
         return sections
 
@@ -190,5 +191,7 @@ class Sidebar(QFrame):
         }
         item.setToolTip(tips[owner.kind])
 
+        # the current item may sit far down the list, so bring it into view
         if owner == self.current:
             self.list.setCurrentItem(item)
+            self.list.scrollToItem(item)
