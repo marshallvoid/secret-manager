@@ -1,0 +1,18 @@
+[project]
+name = "secret-manager"
+version = "0.1.0"
+description = "Desktop app for GitHub secrets and variables, Firestore, Secret Manager and Remote Config"
+requires-python = ">=3.10"
+dependencies = [
+    "google-cloud-firestore>=2.11",
+    "google-cloud-secret-manager>=2.16",
+    "pydantic>=2.7",
+    "pyside6-essentials>=6.6",
+]
+
+[project.scripts]
+secret-manager = "secret_manager.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
