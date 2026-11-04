@@ -300,7 +300,7 @@ class DocumentPanel(Panel):
 
         menu.addSeparator()
         menu.addAction(
-            "Copy value", lambda: browser.copy_text(text=values.plain(value=value))
+            "Copy value", lambda: browser.copy_value(text=values.plain(value=value))
         )
         menu.addAction(
             "Copy field path", lambda: browser.copy_text(text=field_path(path=path))

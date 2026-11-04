@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QResizeEvent
 from PySide6.QtWidgets import QFrame, QLabel, QMessageBox, QSplitter, QVBoxLayout
 
+from ...clipboard import copy_secret
 from ...dialogs import ConfirmDialog, ask_yes_no
 from ...widgets import discard
 from . import values
@@ -232,6 +233,10 @@ class Browser(QFrame):
     def copy_text(self, text: str) -> None:
         QGuiApplication.clipboard().setText(text)
         self.app.status(text="Copied to the clipboard")
+
+    # values may be secrets, so they leave the clipboard again
+    def copy_value(self, text: str) -> None:
+        self.app.status(text=copy_secret(text=text))
 
     def doc_data(self, doc_path: str) -> dict[str, Any]:
         cached = self.cache.get(NodeKey(kind="document", path=doc_path))

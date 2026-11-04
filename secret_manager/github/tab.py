@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import theme
+from ..clipboard import copy_secret
 from ..dialogs import ConfirmDialog
 from ..settings import AppSettings
 from ..widgets import (
@@ -551,8 +552,7 @@ class GitHubTab(QWidget):
         return self.directory.all_repo_names()
 
     def copy_value(self, value: str) -> None:
-        QGuiApplication.clipboard().setText(value)
-        self.app.status(text="Copied the value to the clipboard")
+        self.app.status(text=copy_secret(text=value))
 
     def save(self, target: Target, results: list[EntryResult]) -> None:
         def work() -> None:

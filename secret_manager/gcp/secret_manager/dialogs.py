@@ -4,7 +4,6 @@ import base64
 import re
 from collections.abc import Callable
 
-from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -16,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from ... import theme
+from ...clipboard import CLEAR_SECONDS, copy_secret
 from ...dialogs import Dialog
 from ...widgets import muted, read_text_file
 from .models import NewSecret
@@ -171,7 +171,8 @@ class ValueDialog(Dialog):
         self.content.addWidget(muted(text=note))
 
         copy = QPushButton("Copy")
-        copy.clicked.connect(lambda _=False: QGuiApplication.clipboard().setText(text))
+        copy.setToolTip(f"The clipboard clears again after {CLEAR_SECONDS} seconds")
+        copy.clicked.connect(lambda _=False: copy_secret(text=text))
         self.buttons.insertWidget(0, copy)
 
         if on_push is not None:
