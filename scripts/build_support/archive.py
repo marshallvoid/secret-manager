@@ -19,7 +19,7 @@ def stage(output: Path, destination: Path, target: BuildTarget, notices: str, ve
         shutil.copytree(src=source, dst=destination / source.name, symlinks=True)
 
     (destination / "THIRD_PARTY_NOTICES.txt").write_text(data=notices, encoding="utf-8")
-    (destination / "VERSION").write_text(data=f"{version}\n", encoding="utf-8")
+    (destination / "VERSION").write_bytes(data=f"{version}\n".encode())
     (destination / "README.txt").write_text(
         data=(
             "Secret Manager portable\n\n"
