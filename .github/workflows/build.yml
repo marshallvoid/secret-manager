@@ -1,0 +1,139 @@
+name: Build and release
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-and-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install uv==0.13.7
+      - run: uv sync --locked --group dev --group build --python python
+      - run: make lint
+
+  test:
+    runs-on: ubuntu-22.04
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install Linux Qt libraries
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
+      - run: python -m pip install uv==0.13.7
+      - run: uv sync --locked --no-default-groups --group build --python python
+      - run: uv run --no-env-file --no-sync python -m unittest discover -s tests -v
+
+  release:
+    if: github.event_name == 'push'
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.semantic.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Determine version and create draft release
+        id: semantic
+        run: npx --yes -p semantic-release@24 -p @semantic-release/exec@6 semantic-release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  build:
+    needs: [lint, test, release]
+    if: >-
+      !cancelled() && needs.lint.result == 'success' && needs.test.result == 'success' &&
+      (needs.release.outputs.tag != '' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            asset: SecretManager-linux-x86_64.tar.gz
+          - os: windows-latest
+            asset: SecretManager-windows-x86_64.zip
+          - os: macos-latest
+            asset: SecretManager-macos-arm64.zip
+          - os: macos-15-intel
+            asset: SecretManager-macos-x86_64.zip
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install Linux Qt libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
+      - name: Install uv
+        run: python -m pip install uv==0.13.7
+      - name: Install dependencies
+        run: uv sync --locked --no-default-groups --group build --python python
+      - name: Test
+        run: uv run --no-env-file --no-sync python -m unittest discover -s tests -v
+      - name: Build and smoke test
+        run: uv run --no-env-file --no-sync python scripts/build.py
+        env:
+          SECRET_MANAGER_VERSION: ${{ needs.release.outputs.tag }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecretManager-${{ matrix.os }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+      - name: Attach portable to draft release
+        if: needs.release.outputs.tag != ''
+        shell: bash
+        run: gh release upload "$RELEASE_TAG" "dist/$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          ASSET: ${{ matrix.asset }}
+
+  publish:
+    needs: [release, build]
+    if: needs.release.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish only after all four portables are attached
+        shell: bash
+        run: |
+          count=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')
+          test "$count" -eq 4
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}

@@ -16,3 +16,12 @@ secret-manager = "secret_manager.__main__:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+build = ["pyinstaller>=6.16,<7"]
+dev = [
+    "mypy==2.4.1",
+    "pre-commit==4.7.0; python_version >= '3.11'",
+    "pyright==1.1.414",
+    "ruff==0.17.3",
+]

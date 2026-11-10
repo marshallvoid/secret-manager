@@ -19,6 +19,70 @@ uv run secret-manager
 - Needs Python 3.10 or newer.
 - The window opens maximized.
 
+## Development commands
+
+| Command | Action |
+|---|---|
+| `make install` | Install locked app, build and development dependencies with uv |
+| `make run` | Open the app |
+| `make test` | Run tests using synthetic data |
+| `make lint` | Run Ruff checks, format validation, strict mypy and Pyright |
+| `make check` | Run lint and tests |
+| `make format` | Apply Ruff fixes and formatting |
+| `make hooks` | Install local pre-commit hooks (Python 3.11+) |
+| `make build` | Build and smoke-test a portable archive for the current platform |
+| `make clean` | Remove generated files in `dist/` |
+
+## Code checks
+
+- Run `make format` before `make check`.
+- Ruff targets Python 3.10, matching the app's minimum Python version.
+- The formatter manages trailing commas; the conflicting `COM812` rule is not enabled.
+- Collection annotations stay in `typing`, following the project's Python rules.
+- Pyright uses the same configuration in the terminal and Pylance; deprecated typing aliases are allowed.
+- Firestore's heterogeneous SDK-native values allow explicit `Any` annotations in the value adapters.
+- The optional pre-commit hooks check staged Python files without rewriting them.
+- CI runs lint and tests before creating a release or building portable artifacts.
+
+## Portable builds
+
+- Build with `make build`, or `uv run --no-env-file --locked --group build python scripts/build.py`.
+- Each platform builds on its own OS; cross-compilation is not supported.
+- The **Build and release** workflow builds all four targets for a release or a manual run.
+- Extract the whole archive before running; Python is bundled.
+- GitHub features still require `gh` installed on `PATH` and signed in.
+- Google Cloud features use a service account file selected by the user.
+- Builds include compiled application files and dependency notices, without user settings or credentials.
+- Builds are unsigned; macOS builds are not notarized.
+- Linux builds require compatible system libraries; the workflow uses Ubuntu 22.04.
+- The smoke test checks Qt and cloud imports without loading user settings or credentials.
+- Each archive includes a `VERSION` file: the release version, or the project version for a local/manual build.
+
+| Platform | Archive | Open after extraction |
+|---|---|---|
+| Linux x86_64 | `dist/SecretManager-linux-x86_64.tar.gz` | `SecretManager/SecretManager` |
+| Windows x86_64 | `dist/SecretManager-windows-x86_64.zip` | `SecretManager/SecretManager.exe` |
+| macOS Apple Silicon | `dist/SecretManager-macos-arm64.zip` | `SecretManager.app` |
+| macOS Intel | `dist/SecretManager-macos-x86_64.zip` | `SecretManager.app` |
+
+## Releases
+
+- Pull requests and pushes to `main` run lint and tests.
+- After checks pass on `main`, semantic-release reads Conventional Commits and creates a version tag and draft release.
+- All four portable builds attach their archives to that draft.
+- The release becomes public and latest only after every build succeeds and all four archives are attached.
+- A failed build leaves the release as a draft.
+- Manual workflow runs build artifacts without creating a release.
+- The pipeline uses the built-in GitHub Actions token; no custom credential file is required.
+- Python package metadata keeps the source version; release builds record their tag version in `VERSION`.
+
+| Commit | Version change |
+|---|---|
+| `fix: ...` | Patch |
+| `feat: ...` | Minor |
+| `BREAKING CHANGE: ...` in the commit body/footer | Major |
+| `docs: ...`, `chore: ...`, `test: ...` | No release by default |
+
 ## Firestore
 
 - Breadcrumb path on top: click a segment to go back, or the pencil to type a path.
@@ -110,6 +174,8 @@ uv run secret-manager
 | `firestore_path` | The last place opened in Firestore |
 | `tab`, `google_tab` | The open tabs |
 | `github_owner`, `github_kind`, `github_scope` | The GitHub item, Secrets or Variables, and scope |
+| `github_repo_filter`, `github_repo_search` | The repository secrets filter and search text |
+| `github_collapsed_sections` | Collapsed GitHub sidebar groups |
 
 ## Layout
 

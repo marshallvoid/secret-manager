@@ -1,0 +1,9 @@
+{
+  "include": ["secret_manager", "scripts", "tests"],
+  "exclude": ["dist", "build", ".venv"],
+  "pythonVersion": "3.10",
+  "venvPath": ".",
+  "venv": ".venv",
+  "typeCheckingMode": "standard",
+  "deprecateTypingAliases": false
+}
