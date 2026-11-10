@@ -102,9 +102,7 @@ class SecretsTab(QWidget):
         self.list.setObjectName("Items")
         self.list.setItemDelegate(theme.ChevronDelegate(parent=self.list))
         self.list.setFrameShape(QFrame.Shape.NoFrame)
-        self.list.itemClicked.connect(
-            lambda item: self.open_secret(secret_id=item.data(ID_ROLE))
-        )
+        self.list.itemClicked.connect(lambda item: self.open_secret(secret_id=item.data(ID_ROLE)))
         layout.addWidget(self.list, 1)
 
         self.note = QLabel("Not connected")
@@ -172,6 +170,7 @@ class SecretsTab(QWidget):
             "A destroyed version cannot be restored."
         )
         footer.setContentsMargins(16, 8, 16, 10)
+        footer.setWordWrap(True)
         layout.addWidget(footer)
         self._show_detail(visible=False)
 
@@ -197,8 +196,14 @@ class SecretsTab(QWidget):
 
         self.note.setText("Loading secrets…")
         self.note.show()
+        self.loading.show_text(title="Loading secrets…")
+        self.stack.setCurrentIndex(LOADING)
 
         def done(secrets: list[SecretInfo]) -> None:
+
+            if self.store is not store:
+                return
+
             self.secrets = secrets
             self.fill()
 
@@ -216,11 +221,19 @@ class SecretsTab(QWidget):
             self.stack.setCurrentIndex(EMPTY)
 
         def failed(exc: Exception) -> None:
-            self.note.setText(f"Could not list secrets: {str(exc).splitlines()[0]}")
 
-        self.app.run(
-            work=store.list_secrets, done=done, busy="Loading secrets…", failed=failed
-        )
+            if self.store is not store:
+                return
+
+            self.secrets = []
+            self.current = None
+            self.list.clear()
+            self.note.hide()
+            self._show_detail(visible=False)
+            self.empty.show_text(title="Could not list secrets", text=str(exc))
+            self.stack.setCurrentIndex(EMPTY)
+
+        self.app.run(work=store.list_secrets, done=done, busy="Loading secrets…", failed=failed)
 
     def fill(self) -> None:
         text = self.search.text().strip().lower()
@@ -269,7 +282,9 @@ class SecretsTab(QWidget):
                 self.paint_versions(secret_id=secret_id, versions=versions)
 
         def failed(exc: Exception) -> None:
-            self.loading.show_text(title="Could not load versions", text=str(exc))
+
+            if self.current == secret_id:
+                self.loading.show_text(title="Could not load versions", text=str(exc))
 
         self.app.run(
             work=lambda: store.list_versions(secret_id=secret_id),
@@ -293,17 +308,18 @@ class SecretsTab(QWidget):
         for index, version in enumerate(versions):
             number = version.number
             item = QListWidgetItem(self.versions)
+
+            def view(number: str = number) -> None:
+                self.view(secret_id=secret_id, version=number)
+
+            def change(action: VersionAction, number: str = number) -> None:
+                self.change(secret_id=secret_id, version=number, action=action)
+
             row = VersionRow(
                 version=version,
                 latest=index == 0,
-                on_view=lambda number=number: self.view(
-                    secret_id=secret_id, version=number
-                ),
-                on_change=lambda action, number=number: self.change(
-                    secret_id=secret_id,
-                    version=number,
-                    action=action,
-                ),
+                on_view=view,
+                on_change=change,
             )
             item.setSizeHint(QSize(0, row.sizeHint().height()))
             self.versions.setItemWidget(item, row)
@@ -357,9 +373,7 @@ class SecretsTab(QWidget):
             return
 
         def push(text: str) -> None:
-            self.app.github.push_secret(
-                parent=self, name=env_name(text=secret_id), value=text
-            )
+            self.app.github.push_secret(parent=self, name=env_name(text=secret_id), value=text)
 
         def done(data: bytes) -> None:
             ValueDialog(
@@ -392,9 +406,7 @@ class SecretsTab(QWidget):
             return
 
         self.app.run(
-            work=lambda: store.change_version(
-                secret_id=secret_id, version=version, action=action
-            ),
+            work=lambda: store.change_version(secret_id=secret_id, version=version, action=action),
             done=lambda _: self.open_secret(secret_id=secret_id),
             busy=f"{verb}…",
         )
@@ -425,7 +437,5 @@ class SecretsTab(QWidget):
 
     def copy_resource_name(self) -> None:
         if self.store is not None and self.current:
-            QGuiApplication.clipboard().setText(
-                f"{self.store.parent}/secrets/{self.current}"
-            )
+            QGuiApplication.clipboard().setText(f"{self.store.parent}/secrets/{self.current}")
             self.app.status(text="Copied the resource name")

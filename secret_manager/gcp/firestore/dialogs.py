@@ -22,7 +22,7 @@ from .models import DocumentResult, FieldResult, Query
 from .store import LIST_OPERATORS, OPERATORS, auto_id, check_field_name, check_id
 
 
-class FieldDialog(Dialog):
+class FieldDialog(Dialog[FieldResult]):
     def __init__(
         self,
         parent: QWidget,
@@ -71,7 +71,7 @@ class FieldDialog(Dialog):
         return super().ask()
 
 
-class DocumentDialog(Dialog):
+class DocumentDialog(Dialog[DocumentResult]):
     def __init__(
         self,
         parent: QWidget,
@@ -121,19 +121,15 @@ class DocumentDialog(Dialog):
         if problem:
             raise ValueError(f"Document ID: {problem}")
 
-        return DocumentResult(
-            collection=collection, doc_id=doc_id, data=self.fields.values()
-        )
+        return DocumentResult(collection=collection, doc_id=doc_id, data=self.fields.values())
 
     def ask(self) -> DocumentResult | None:
         return super().ask()
 
 
 # Returns the new query; an inactive query clears the filter
-class FilterDialog(Dialog):
-    def __init__(
-        self, parent: QWidget, collection: str, query: Query | None = None
-    ) -> None:
+class FilterDialog(Dialog[Query]):
+    def __init__(self, parent: QWidget, collection: str, query: Query | None = None) -> None:
         super().__init__(parent=parent, title=f"Filter {collection}", ok_text="Apply")
         query = query or Query()
 
@@ -165,10 +161,7 @@ class FilterDialog(Dialog):
         sort_form.addRow("Direction", self.direction_box)
         self.content.addWidget(self.sort_box)
         self.content.addWidget(
-            muted(
-                text="Filters and sorting may need an index. "
-                "Documents without the sorted field are left out."
-            )
+            muted(text="Filters and sorting may need an index. Documents without the sorted field are left out.")
         )
 
         clear = QPushButton("Clear filter")

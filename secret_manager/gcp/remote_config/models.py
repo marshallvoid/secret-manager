@@ -52,9 +52,7 @@ class ParamValue(ApiModel):
 
 class ApiParameter(ApiModel):
     default_value: ParamValue | None = Field(default=None, alias="defaultValue")
-    conditional_values: dict[str, ParamValue] = Field(
-        default_factory=dict, alias="conditionalValues"
-    )
+    conditional_values: dict[str, ParamValue] = Field(default_factory=dict, alias="conditionalValues")
     description: str = ""
     value_type: str = Field(default="STRING", alias="valueType")
 
@@ -83,9 +81,7 @@ class UpdateUser(ApiModel):
 
 
 class TemplateVersion(ApiModel):
-    model_config = ConfigDict(
-        populate_by_name=True, extra="allow", coerce_numbers_to_str=True
-    )
+    model_config = ConfigDict(populate_by_name=True, extra="allow", coerce_numbers_to_str=True)
 
     version_number: str = Field(default="", alias="versionNumber")
     update_time: str = Field(default="", alias="updateTime")
@@ -98,9 +94,7 @@ class TemplateVersion(ApiModel):
 class ApiTemplate(ApiModel):
     conditions: list[Condition] = Field(default_factory=list)
     parameters: dict[str, ApiParameter] = Field(default_factory=dict)
-    parameter_groups: dict[str, ApiGroup] = Field(
-        default_factory=dict, alias="parameterGroups"
-    )
+    parameter_groups: dict[str, ApiGroup] = Field(default_factory=dict, alias="parameterGroups")
     version: TemplateVersion | None = None
 
 
@@ -143,9 +137,7 @@ class Parameter(BaseModel):
             data["defaultValue"] = self.default.to_api()
 
         if self.conditional:
-            data["conditionalValues"] = {
-                name: value.to_api() for name, value in self.conditional.items()
-            }
+            data["conditionalValues"] = {name: value.to_api() for name, value in self.conditional.items()}
 
         if self.description:
             data["description"] = self.description
@@ -168,17 +160,11 @@ class Template(BaseModel):
         return next((param for param in self.parameters if param.key == key), None)
 
     def body(self) -> dict[str, Any]:
-        ungrouped = {
-            param.key: param.to_api() for param in self.parameters if not param.group
-        }
+        ungrouped = {param.key: param.to_api() for param in self.parameters if not param.group}
         groups: dict[str, Any] = {}
 
         for name, description in self.groups.items():
-            members = {
-                param.key: param.to_api()
-                for param in self.parameters
-                if param.group == name
-            }
+            members = {param.key: param.to_api() for param in self.parameters if param.group == name}
 
             # the API refuses empty groups
             if not members:
@@ -198,15 +184,10 @@ class Template(BaseModel):
     def rename_condition(self, old: str, new: str) -> None:
         for param in self.parameters:
             if old in param.conditional:
-                param.conditional = {
-                    (new if name == old else name): value
-                    for name, value in param.conditional.items()
-                }
+                param.conditional = {(new if name == old else name): value for name, value in param.conditional.items()}
 
     def drop_condition(self, name: str) -> None:
-        self.conditions = [
-            condition for condition in self.conditions if condition.name != name
-        ]
+        self.conditions = [condition for condition in self.conditions if condition.name != name]
 
         for param in self.parameters:
             param.conditional.pop(name, None)
@@ -222,9 +203,7 @@ def parse_template(api: ApiTemplate, etag: str) -> Template:
         template.groups[group] = group_data.description
 
         for key, param in group_data.parameters.items():
-            template.parameters.append(
-                Parameter.from_api(key=key, data=param, group=group)
-            )
+            template.parameters.append(Parameter.from_api(key=key, data=param, group=group))
 
     template.parameters.sort(key=lambda param: param.key.lower())
 

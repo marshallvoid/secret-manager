@@ -55,9 +55,7 @@ class Browser(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        self.breadcrumb = Breadcrumb(
-            navigate=lambda segments: self.navigate(segments=segments)
-        )
+        self.breadcrumb = Breadcrumb(navigate=lambda segments: self.navigate(segments=segments))
         layout.addWidget(self.breadcrumb)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -65,7 +63,7 @@ class Browser(QFrame):
         self.splitter.setHandleWidth(5)
         self.splitter.splitterMoved.connect(self._user_resized)
         layout.addWidget(self.splitter, 1)
-        self.render()
+        self.render_panels()
 
     def require_store(self) -> Store:
         if self.store is None:
@@ -93,7 +91,7 @@ class Browser(QFrame):
     def navigate(self, segments: list[str]) -> None:
         self.path = list(segments)
         self.app.save_settings()
-        self.render()
+        self.render_panels()
 
     def select(self, index: int, child: str) -> None:
         self.navigate(segments=[*self.path[:index], child])
@@ -110,10 +108,7 @@ class Browser(QFrame):
 
         total = self.splitter.width()
         panels = [self.splitter.widget(index) for index in range(count)]
-        firsts = [
-            min(panel.content_width(), total // 3) if isinstance(panel, Panel) else 0
-            for panel in panels[:-1]
-        ]
+        firsts = [min(panel.content_width(), total // 3) if isinstance(panel, Panel) else 0 for panel in panels[:-1]]
         self.splitter.setSizes([*firsts, max(total - sum(firsts), 300)])
 
     def schedule_fit(self) -> None:
@@ -123,18 +118,19 @@ class Browser(QFrame):
         super().resizeEvent(event)
         self.schedule_fit()
 
-    def render(self) -> None:
+    def render_panels(self) -> None:
         for index in reversed(range(self.splitter.count())):
-            discard(widget=self.splitter.widget(index))
+            widget = self.splitter.widget(index)
+
+            if widget is not None:
+                discard(widget=widget)
 
         self.panels = {}
         self.user_sized = False
         self.breadcrumb.set_path(segments=self.path)
 
         if self.store is None:
-            note = QLabel(
-                "Choose a service account file and press Connect to browse Firestore."
-            )
+            note = QLabel("Choose a service account file and press Connect to browse Firestore.")
             note.setObjectName("Note")
             note.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.splitter.addWidget(note)
@@ -196,9 +192,7 @@ class Browser(QFrame):
                 panel.fill(data=result)
                 self.schedule_fit()
 
-            self.app.status(
-                text=f"Loaded /{path}" if path else f"Loaded {store.database}"
-            )
+            self.app.status(text=f"Loaded /{path}" if path else f"Loaded {store.database}")
 
         def failed(exc: Exception) -> None:
             self.loading.discard(key)
@@ -211,7 +205,7 @@ class Browser(QFrame):
 
     def refresh(self) -> None:
         self.cache.clear()
-        self.render()
+        self.render_panels()
 
     # Drops cached panels so they reload; `prefix` also drops everything under a path
     def invalidate(self, keys: list[NodeKey] | None = None, prefix: str = "") -> None:
@@ -219,16 +213,12 @@ class Browser(QFrame):
             self.cache.pop(key, None)
 
         if prefix:
-            stale = [
-                key
-                for key in self.cache
-                if key.path == prefix or key.path.startswith(prefix + "/")
-            ]
+            stale = [key for key in self.cache if key.path == prefix or key.path.startswith(prefix + "/")]
 
             for key in stale:
                 self.cache.pop(key)
 
-        self.render()
+        self.render_panels()
 
     def copy_text(self, text: str) -> None:
         QGuiApplication.clipboard().setText(text)
@@ -269,9 +259,7 @@ class Browser(QFrame):
             self.navigate(segments=parse_path(text=join(coll_path, result.doc_id)))
 
         self.app.run(
-            work=lambda: store.create_document(
-                coll_path=coll_path, doc_id=result.doc_id, data=result.data
-            ),
+            work=lambda: store.create_document(coll_path=coll_path, doc_id=result.doc_id, data=result.data),
             done=done,
             busy="Creating…",
         )
@@ -282,9 +270,7 @@ class Browser(QFrame):
         data: dict[str, Any] | None = None,
         title: str = "Add a document",
     ) -> None:
-        result = DocumentDialog(
-            parent=self, title=title, parent_path="/" + coll_path, data=data
-        ).ask()
+        result = DocumentDialog(parent=self, title=title, parent_path="/" + coll_path, data=data).ask()
 
         if result is None:
             return
@@ -302,9 +288,7 @@ class Browser(QFrame):
             self.navigate(segments=parse_path(text=doc_path))
 
         self.app.run(
-            work=lambda: store.create_document(
-                coll_path=coll_path, doc_id=result.doc_id, data=result.data
-            ),
+            work=lambda: store.create_document(coll_path=coll_path, doc_id=result.doc_id, data=result.data),
             done=done,
             busy="Adding…",
         )
@@ -344,8 +328,7 @@ class Browser(QFrame):
         if not ConfirmDialog(
             parent=self,
             title="Delete document",
-            text=f"This permanently deletes /{doc_path} and all of its subcollections. "
-            "This cannot be undone.",
+            text=f"This permanently deletes /{doc_path} and all of its subcollections. This cannot be undone.",
         ).ask():
             return
 
@@ -375,16 +358,12 @@ class Browser(QFrame):
         store = self.require_store()
         self.app.run(
             work=lambda: store.clear_document(doc_path=doc_path),
-            done=lambda _: self.invalidate(
-                keys=[NodeKey(kind="document", path=doc_path)]
-            ),
+            done=lambda _: self.invalidate(keys=[NodeKey(kind="document", path=doc_path)]),
             busy="Deleting fields…",
         )
 
     def set_filter(self, coll_path: str) -> None:
-        dialog = FilterDialog(
-            parent=self, collection="/" + coll_path, query=self.queries.get(coll_path)
-        )
+        dialog = FilterDialog(parent=self, collection="/" + coll_path, query=self.queries.get(coll_path))
         query = dialog.ask()
 
         if query is None:
@@ -407,9 +386,7 @@ class Browser(QFrame):
         store = self.require_store()
         self.app.run(
             work=lambda: store.update_fields(doc_path=doc_path, changes=changes),
-            done=lambda _: self.invalidate(
-                keys=[NodeKey(kind="document", path=doc_path)]
-            ),
+            done=lambda _: self.invalidate(keys=[NodeKey(kind="document", path=doc_path)]),
             busy="Saving…",
         )
 
@@ -423,9 +400,7 @@ class Browser(QFrame):
             return
 
         if result.name in self.doc_data(doc_path=doc_path):
-            self._warn(
-                title="Add a field", text=f"The field '{result.name}' already exists."
-            )
+            self._warn(title="Add a field", text=f"The field '{result.name}' already exists.")
 
             return
 
@@ -446,31 +421,23 @@ class Browser(QFrame):
             return
 
         if is_map and result.name in parent:
-            self._warn(
-                title="Add a field", text=f"The field '{result.name}' already exists."
-            )
+            self._warn(title="Add a field", text=f"The field '{result.name}' already exists.")
 
             return
 
         if not is_map and values.type_of(value=result.value) == "array":
-            self._warn(
-                title="Add an item", text="An array cannot directly contain an array."
-            )
+            self._warn(title="Add an item", text="An array cannot directly contain an array.")
 
             return
 
         key: str | int = (result.name or "") if is_map else len(parent)
-        top = values.with_set(
-            top=data[path[0]], path=[*path[1:], key], value=result.value
-        )
+        top = values.with_set(top=data[str(path[0])], path=[*path[1:], key], value=result.value)
         self.write_fields(doc_path=doc_path, changes={str(path[0]): top})
 
     def edit_field(self, doc_path: str, path: KeyPath) -> None:
         data = self.doc_data(doc_path=doc_path)
         value = values.get_at(data=data, path=path)
-        in_map = len(path) == 1 or isinstance(
-            values.get_at(data=data, path=path[:-1]), dict
-        )
+        in_map = len(path) == 1 or isinstance(values.get_at(data=data, path=path[:-1]), dict)
         result = FieldDialog(
             parent=self,
             title=f"Edit {field_path(path=path)}",
@@ -492,9 +459,7 @@ class Browser(QFrame):
             return
 
         if not in_map and values.type_of(value=result.value) == "array":
-            self._warn(
-                title="Edit field", text="An array cannot directly contain an array."
-            )
+            self._warn(title="Edit field", text="An array cannot directly contain an array.")
 
             return
 
@@ -506,16 +471,10 @@ class Browser(QFrame):
             if renamed:
                 changes[top_name] = DELETE
         elif renamed:
-            top = values.with_renamed(
-                top=data[top_name], path=path[1:], new_key=name, value=result.value
-            )
+            top = values.with_renamed(top=data[top_name], path=path[1:], new_key=name, value=result.value)
             changes = {top_name: top}
         else:
-            changes = {
-                top_name: values.with_set(
-                    top=data[top_name], path=path[1:], value=result.value
-                )
-            }
+            changes = {top_name: values.with_set(top=data[top_name], path=path[1:], value=result.value)}
 
         self.write_fields(doc_path=doc_path, changes=changes)
 

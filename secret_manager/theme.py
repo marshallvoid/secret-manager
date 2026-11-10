@@ -10,19 +10,59 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
 )
 
-BG = "#202124"
-SURFACE = "#292a2d"
-HOVER = "#2d2e31"
-SELECT = "#37393d"
-BORDER = "#4a4e63"
-TEXT = "#e8eaed"
-MUTED = "#9aa0a6"
-ACCENT = "#8ab4f8"
-DANGER = "#f28b82"
-FONT_PT = 12
+BG = "#101722"
+SURFACE = "#182230"
+HOVER = "#223044"
+SELECT = "#293e50"
+BORDER = "#42536a"
+TEXT = "#edf3fa"
+MUTED = "#a8b8cb"
+ACCENT = "#7de2c3"
+DANGER = "#ffaaa5"
+FONT_PT = 11
 MONO = "'Roboto Mono', 'JetBrains Mono', 'DejaVu Sans Mono', monospace"
 
 STYLE = f"""
+QMainWindow, QDialog {{ background: {BG}; }}
+QLabel {{ background: transparent; }}
+QPushButton, QToolButton {{
+    background: {SURFACE}; color: {TEXT}; border: 1px solid {BORDER};
+    border-radius: 6px; padding: 7px 12px; min-height: 22px;
+}}
+QPushButton:hover, QToolButton:hover {{ background: {HOVER}; border-color: {MUTED}; }}
+QPushButton:pressed, QToolButton:pressed {{ background: {SELECT}; }}
+QPushButton:disabled, QToolButton:disabled {{ color: {MUTED}; background: {SURFACE}; }}
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QTextEdit {{
+    background: {BG}; color: {TEXT}; border: 1px solid {BORDER};
+    border-radius: 6px; padding: 7px 10px; selection-background-color: {SELECT};
+    selection-color: {TEXT};
+}}
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ min-height: 22px; }}
+QLineEdit QToolButton {{
+    border: none; background: transparent; padding: 0;
+    min-height: 0; min-width: 0;
+}}
+QLineEdit QToolButton:hover {{ background: {HOVER}; }}
+QComboBox::drop-down {{ border: none; width: 24px; }}
+QComboBox QAbstractItemView {{ background: {SURFACE}; selection-background-color: {SELECT}; }}
+QCheckBox, QRadioButton {{ spacing: 8px; padding: 4px 0; }}
+QMenu {{ background: {SURFACE}; border: 1px solid {BORDER}; padding: 6px; }}
+QMenu::item {{ padding: 8px 24px; border-radius: 4px; }}
+QMenu::item:selected {{ background: {SELECT}; color: {TEXT}; }}
+QToolTip {{ background: {SURFACE}; color: {TEXT}; border: 1px solid {BORDER}; padding: 6px; }}
+QStatusBar {{ background: {BG}; color: {MUTED}; border-top: 1px solid {BORDER}; padding: 4px 12px; }}
+QStatusBar::item {{ border: none; }}
+QFrame#AppHeader {{ background: {BG}; border-bottom: 1px solid {BORDER}; }}
+QLabel#AppTitle {{ font-size: 18pt; font-weight: 600; }}
+QLabel#AppSubtitle {{ color: {MUTED}; font-size: 10pt; }}
+QFrame#ConnectionCard {{ background: {SURFACE}; border: 1px solid {BORDER}; border-radius: 8px; }}
+QTabWidget#Providers > QTabBar::tab {{ padding: 12px 24px; font-weight: 600; }}
+QScrollBar:vertical {{ background: transparent; width: 12px; margin: 2px; }}
+QScrollBar::handle:vertical {{ background: {BORDER}; border-radius: 4px; min-height: 32px; }}
+QScrollBar:horizontal {{ background: transparent; height: 12px; margin: 2px; }}
+QScrollBar::handle:horizontal {{ background: {BORDER}; border-radius: 4px; min-width: 32px; }}
+QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
+QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 QFrame#Browser {{ border: 1px solid {BORDER}; border-radius: 8px; }}
 QFrame#Breadcrumb {{ border: none; border-bottom: 1px solid {BORDER}; }}
 QFrame#Panel {{ border: none; }}
@@ -30,7 +70,7 @@ QSplitter::handle:horizontal {{ background: transparent; border-left: 1px solid 
 QSplitter::handle:horizontal:hover {{ border-left: 2px solid {ACCENT}; }}
 QWidget#PanelHeader {{ border-bottom: 1px solid {BORDER}; }}
 QFrame#Separator {{ border: none; border-top: 1px solid {BORDER}; }}
-QLabel#PanelTitle {{ font-family: {MONO}; font-size: {FONT_PT + 1}pt; }}
+QLabel#PanelTitle {{ font-size: {FONT_PT + 1}pt; font-weight: 600; }}
 QLabel#DialogTitle {{ font-size: {FONT_PT + 4}pt; padding-bottom: 6px; }}
 QLabel#Muted {{ color: {MUTED}; }}
 QLabel#Note {{ color: {MUTED}; font-style: italic; padding: 10px 16px; }}
@@ -47,6 +87,9 @@ QPushButton#Danger {{
     color: {BG}; background: {DANGER}; border: none; border-radius: 4px; padding: 6px 18px;
 }}
 QPushButton#Primary:disabled, QPushButton#Danger:disabled {{ background: {SELECT}; color: {MUTED}; }}
+QPushButton#Primary:hover {{ background: #a1ecd6; }}
+QPushButton#Danger:hover {{ background: #ffc5c1; }}
+QPushButton#Primary:pressed, QPushButton#Danger:pressed {{ background: {MUTED}; }}
 QToolButton#Flat, QToolButton#Crumb {{
     border: none; background: transparent; border-radius: 4px; padding: 3px 5px;
 }}
@@ -59,6 +102,7 @@ QListWidget#Items, QTreeWidget#Fields {{
     border: none; background: transparent; font-family: {MONO}; outline: 0;
 }}
 QListWidget#Items::item {{ padding: 6px 28px 6px 44px; color: {TEXT}; border: none; }}
+QListWidget#Items[repositoryList="true"]::item {{ padding-left: 12px; }}
 QListWidget#Items::item:hover {{ background: {HOVER}; }}
 QListWidget#Items::item:selected {{ background: {SELECT}; color: {TEXT}; }}
 QTreeWidget#Fields::item {{ padding: 5px 0; border: none; color: {TEXT}; }}
@@ -69,7 +113,7 @@ QToolButton#Chip {{
     color: {MUTED};
 }}
 QToolButton#Chip:hover {{ background: {HOVER}; }}
-QToolButton#Chip:checked {{ background: #394457; border-color: {ACCENT}; color: {ACCENT}; }}
+QToolButton#Chip:checked {{ background: {SELECT}; border-color: {ACCENT}; color: {ACCENT}; }}
 QLabel#RepoTitle {{ font-family: {MONO}; font-size: {FONT_PT + 3}pt; }}
 QLabel#SecretName {{ font-family: {MONO}; color: {TEXT}; }}
 QLabel#EmptyTitle {{ font-size: {FONT_PT + 2}pt; color: {TEXT}; }}
@@ -78,12 +122,18 @@ QListWidget#Secrets {{ border: none; background: transparent; outline: 0; }}
 QListWidget#Secrets::item {{ border: none; border-bottom: 1px solid {SURFACE}; }}
 QListWidget#Secrets::item:hover {{ background: {HOVER}; }}
 QListWidget#Secrets::item:selected {{ background: {SELECT}; }}
-QLineEdit#Search {{ padding: 6px 8px; border-radius: 6px; }}
+QLineEdit#Search {{ padding: 7px 10px; border-radius: 6px; }}
 QWidget#Separator {{ background: {BORDER}; }}
 QLabel#Badge {{ border: 1px solid; border-radius: 9px; padding: 1px 8px; }}
 QLabel#SectionHeader {{
     color: {MUTED}; font-size: {FONT_PT - 2}pt; font-weight: bold; padding: 10px 0 2px 0;
 }}
+QToolButton#SectionToggle {{
+    color: {MUTED}; background: transparent; border: 1px solid transparent;
+    border-radius: 4px; padding: 4px 8px; text-align: left; font-weight: 600;
+}}
+QToolButton#SectionToggle:hover {{ background: {HOVER}; color: {TEXT}; }}
+QToolButton#SectionToggle:focus {{ border-color: {ACCENT}; }}
 QLabel#Value {{ font-family: {MONO}; color: {MUTED}; }}
 QLabel#Banner {{ color: {BG}; background: #fdd663; padding: 8px 16px; }}
 QTreeWidget#Table {{ border: none; background: transparent; outline: 0; }}
@@ -96,11 +146,21 @@ QHeaderView::section {{
 }}
 QTreeWidget#Plain {{ border: 1px solid {BORDER}; border-radius: 6px; }}
 QScrollArea {{ border: none; background: transparent; }}
-QTabWidget::pane {{ border: none; }}
-QTabBar::tab {{ padding: 8px 18px; background: transparent; color: {MUTED}; border: none; }}
+QTabWidget::pane {{ border: none; padding-top: 12px; }}
+QTabBar::tab {{ padding: 10px 18px; background: transparent; color: {MUTED}; border: none; border-bottom: 2px solid transparent; }}
+QTabBar::tab:hover {{ background: {HOVER}; color: {TEXT}; }}
 QTabBar::tab:selected {{ color: {ACCENT}; border-bottom: 2px solid {ACCENT}; }}
 QGroupBox {{ border: 1px solid {BORDER}; border-radius: 6px; margin-top: 14px; padding: 10px; }}
 QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
+QLineEdit:focus, QLineEdit#Search:focus, QComboBox:focus, QPlainTextEdit:focus,
+QTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus,
+QPushButton:focus, QPushButton#Primary:focus, QPushButton#Danger:focus,
+QPushButton#Link:focus, QToolButton:focus, QToolButton#Flat:focus,
+QToolButton#Crumb:focus, QToolButton#Chip:focus {{ border: 1px solid {ACCENT}; }}
+QListWidget#Items:focus, QListWidget#Secrets:focus, QTreeWidget#Fields:focus,
+QTreeWidget#Table:focus {{ border: 1px solid {ACCENT}; }}
+QCheckBox:focus, QRadioButton:focus {{ outline: 1px solid {ACCENT}; }}
+QTabBar::tab:selected:focus {{ background: {SELECT}; }}
 """
 
 
@@ -142,7 +202,7 @@ def apply(app: QApplication) -> None:
     app.setStyleSheet(STYLE)
 
 
-# Material icon paths (24×24), the set the Firebase console uses
+# Material icon paths (24x24), the set the Firebase console uses
 PATHS = {
     "database": "M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z",
     "collection": "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
@@ -177,8 +237,7 @@ _icons: dict[tuple[str, str], QIcon] = {}
 def named_icon(key: str, color: str = MUTED) -> QIcon:
     if (key, color) not in _icons:
         svg = (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
-            f'<path fill="{color}" d="{PATHS[key]}"/></svg>'
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="{color}" d="{PATHS[key]}"/></svg>'
         )
         renderer = QSvgRenderer(QByteArray(svg.encode("ascii")))
         pixmap = QPixmap(48, 48)

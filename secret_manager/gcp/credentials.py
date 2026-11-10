@@ -21,13 +21,9 @@ class GoogleAccount(BaseModel):
 
 def load_account(path: str) -> GoogleAccount:
     try:
-        credentials = service_account.Credentials.from_service_account_file(
-            path, scopes=SCOPES
-        )
+        credentials = service_account.Credentials.from_service_account_file(path, scopes=SCOPES)
     except (OSError, ValueError, KeyError) as exc:
-        raise CredentialsError(
-            f"Cannot read service account credentials: {exc}"
-        ) from exc
+        raise CredentialsError(f"Cannot read service account credentials: {exc}") from exc
 
     if not credentials.project_id:
         raise CredentialsError("The credentials file has no project_id.")

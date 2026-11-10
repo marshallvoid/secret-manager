@@ -131,9 +131,7 @@ class ValueRow(QWidget):
         layout.addWidget(self.remove)
 
     def condition(self) -> str:
-        return (
-            self.condition_box.currentText() if self.condition_box is not None else ""
-        )
+        return self.condition_box.currentText() if self.condition_box is not None else ""
 
     def set_type(self, value_type: str) -> None:
         if self.editor is not None:
@@ -144,25 +142,21 @@ class ValueRow(QWidget):
             return self.original
 
         if self.in_app is not None and self.in_app.isChecked():
-            return ParamValue(use_in_app_default=True)
+            return ParamValue.model_validate(obj={"use_in_app_default": True})
 
         text = self.editor.text()
         problem = check_value(value_type=value_type, value=text)
 
         if problem:
-            where = (
-                f"Value for {self.condition()}" if self.condition() else "Default value"
-            )
+            where = f"Value for {self.condition()}" if self.condition() else "Default value"
 
             raise ValueError(f"{where}: {problem}")
 
         return ParamValue(value=text)
 
 
-class ParameterDialog(Dialog):
-    def __init__(
-        self, parent: QWidget, template: Template, param: Parameter | None
-    ) -> None:
+class ParameterDialog(Dialog[Parameter]):
+    def __init__(self, parent: QWidget, template: Template, param: Parameter | None) -> None:
         title = f"Edit {param.key}" if param else "Add a parameter"
         super().__init__(parent=parent, title=title, ok_text="Save", width=820)
         self.resize(820, 620)
@@ -189,7 +183,9 @@ class ParameterDialog(Dialog):
         self.group_box.setEditable(True)
         self.group_box.addItems(["", *sorted(template.groups)])
         self.group_box.setCurrentText(param.group)
-        self.group_box.lineEdit().setPlaceholderText("No group")
+        group_edit = self.group_box.lineEdit()
+        assert group_edit is not None
+        group_edit.setPlaceholderText("No group")
         form.addRow("Group", self.group_box)
         self.content.addLayout(form)
 
@@ -207,16 +203,12 @@ class ParameterDialog(Dialog):
         holder_layout.setContentsMargins(0, 0, 8, 0)
         self.rows_layout = QVBoxLayout()
         holder_layout.addLayout(self.rows_layout)
-        self.add_button = link_button(
-            text="Add value for condition", action=self._add_empty_row
-        )
+        self.add_button = link_button(text="Add value for condition", action=self._add_empty_row)
         self.add_button.setEnabled(bool(template.conditions))
         holder_layout.addWidget(self.add_button)
 
         if not template.conditions:
-            holder_layout.addWidget(
-                muted(text="Add a condition on the Conditions tab first.")
-            )
+            holder_layout.addWidget(muted(text="Add a condition on the Conditions tab first."))
 
         holder_layout.addStretch(1)
         scroll.setWidget(holder)
@@ -290,15 +282,13 @@ class ParameterDialog(Dialog):
         return super().ask()
 
 
-class ConditionDialog(Dialog):
-    def __init__(
-        self, parent: QWidget, template: Template, condition: Condition | None
-    ) -> None:
+class ConditionDialog(Dialog[Condition]):
+    def __init__(self, parent: QWidget, template: Template, condition: Condition | None) -> None:
         title = f"Edit {condition.name}" if condition else "Add a condition"
         super().__init__(parent=parent, title=title, ok_text="Save", width=720)
         self.template = template
         self.original = condition
-        condition = condition or Condition(name="", expression="", tag_color="BLUE")
+        condition = condition or Condition.model_validate(obj={"name": "", "expression": "", "tag_color": "BLUE"})
 
         form = QFormLayout()
         self.name_edit = QLineEdit(condition.name)
@@ -307,9 +297,7 @@ class ConditionDialog(Dialog):
         self.color_box = QComboBox()
 
         for color in TAG_COLORS:
-            self.color_box.addItem(
-                color_icon(color=color), color.replace("_", " ").title(), color
-            )
+            self.color_box.addItem(color_icon(color=color), color.replace("_", " ").title(), color)
 
         if condition.tag_color in TAG_COLORS:
             self.color_box.setCurrentIndex(TAG_COLORS.index(condition.tag_color))
@@ -347,34 +335,28 @@ class ConditionDialog(Dialog):
         if not expression:
             raise ValueError("A condition needs an expression.")
 
-        return Condition(
-            name=name, expression=expression, tag_color=self.color_box.currentData()
+        return Condition.model_validate(
+            obj={"name": name, "expression": expression, "tag_color": self.color_box.currentData()}
         )
 
     def ask(self) -> Condition | None:
         return super().ask()
 
 
-class VersionsDialog(Dialog):
+class VersionsDialog(Dialog[str]):
     def __init__(self, parent: QWidget, versions: list[TemplateVersion]) -> None:
-        super().__init__(
-            parent=parent, title="Template versions", ok_text="Roll back", width=900
-        )
+        super().__init__(parent=parent, title="Template versions", ok_text="Roll back", width=900)
         self.resize(900, 520)
         self.versions = versions
 
         self.table = QTreeWidget()
         self.table.setObjectName("Table")
         self.table.setRootIsDecorated(False)
-        self.table.setHeaderLabels(
-            ["Version", "Published", "By", "Origin", "Description"]
-        )
+        self.table.setHeaderLabels(["Version", "Published", "By", "Origin", "Description"])
         self.table.header().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
 
         for version in versions:
-            description = (
-                version.description or version.update_type.replace("_", " ").title()
-            )
+            description = version.description or version.update_type.replace("_", " ").title()
             QTreeWidgetItem(
                 self.table,
                 [
@@ -390,11 +372,7 @@ class VersionsDialog(Dialog):
             self.table.resizeColumnToContents(column)
 
         self.content.addWidget(self.table, 1)
-        self.content.addWidget(
-            muted(
-                text="Rolling back publishes the chosen version again as a new version."
-            )
-        )
+        self.content.addWidget(muted(text="Rolling back publishes the chosen version again as a new version."))
 
     def build(self) -> str:
         item = self.table.currentItem()

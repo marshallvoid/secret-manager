@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from functools import partial
+from typing import TYPE_CHECKING, List
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
@@ -41,8 +42,9 @@ from ..widgets import (
 from . import cli
 from .dialogs import EntryDialog
 from .envfile import env_names
-from .models import Access, Entry, EntryKind, EntryResult, Owner, Repo, Scope, Target
+from .models import Access, AppName, Entry, EntryKind, EntryResult, Owner, Repo, Scope, Target
 from .rows import EntryRow
+from .secret_index import RepoSecretStatus, inspect_repositories
 from .sidebar import OWNER_ICONS, Directory, Sidebar, repo_owner
 
 if TYPE_CHECKING:
@@ -76,10 +78,7 @@ def scopes_for(owner: Owner, kind: EntryKind, environments: list[str]) -> list[S
     scopes = [Scope(key="actions", label=first)]
 
     if owner.kind == "repo":
-        scopes += [
-            Scope(key=f"env:{env}", label=f"Environment · {env}")
-            for env in environments
-        ]
+        scopes += [Scope(key=f"env:{env}", label=f"Environment · {env}") for env in environments]
 
     # variables only exist for Actions
     if kind == "secret":
@@ -127,13 +126,26 @@ class GitHubTab(QWidget):
         self.owner = saved_owner(settings=app.settings)
         self.kind: EntryKind = app.settings.github_kind
         self.scope = app.settings.github_scope
+        self.directory_generation = 0
+        self.secret_index_loading = False
 
         layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 8, 20, 20)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
         splitter.setHandleWidth(10)
         splitter.setStyleSheet("QSplitter::handle { border: none; }")
-        self.sidebar = Sidebar(on_select=self.open_owner, on_reload=self.load_directory)
+        self.sidebar = Sidebar(
+            on_select=self.open_owner,
+            on_reload=self.load_directory,
+            on_filter=self._filter_repositories,
+            on_change=self.app.save_settings,
+        )
+        self.sidebar.restore_state(
+            repo_filter=app.settings.github_repo_filter,
+            search=app.settings.github_repo_search,
+            collapsed=app.settings.github_collapsed_sections,
+        )
         splitter.addWidget(self.sidebar)
         splitter.addWidget(self._main())
         splitter.setStretchFactor(0, 0)
@@ -150,15 +162,14 @@ class GitHubTab(QWidget):
         )
 
         self.show_header()
+        self.rebuild_chips()
         QTimer.singleShot(0, self.load_directory)
 
         if self.owner is not None:
             owner = self.owner
             QTimer.singleShot(0, lambda: self.open_owner(owner=owner, keep_scope=True))
 
-    def _shortcut(
-        self, keys: QKeySequence.StandardKey, action: Callable[[], None]
-    ) -> None:
+    def _shortcut(self, keys: QKeySequence.StandardKey, action: Callable[[], None]) -> None:
         shortcut = QShortcut(keys, self)
         shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         shortcut.activated.connect(action)
@@ -191,9 +202,7 @@ class GitHubTab(QWidget):
         self.list.setObjectName("Secrets")
         self.list.setFrameShape(QFrame.Shape.NoFrame)
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.list.itemDoubleClicked.connect(
-            lambda item: self.edit(name=item.data(NAME_ROLE))
-        )
+        self.list.itemDoubleClicked.connect(lambda item: self.edit(name=item.data(NAME_ROLE)))
         self.stack.addWidget(self.list)
 
         self.empty = MessagePage(
@@ -282,19 +291,25 @@ class GitHubTab(QWidget):
         settings.github_owner = self.owner
         settings.github_kind = self.kind
         settings.github_scope = self.scope
+        settings.github_repo_filter = self.sidebar.secret_filter.currentData()
+        settings.github_repo_search = self.sidebar.search.text()
+        settings.github_collapsed_sections = sorted(self.sidebar.collapsed)
         settings.repo = ""
 
     def target(self, quiet: bool = False) -> Target | None:
         if self.owner is None:
             if not quiet:
-                QMessageBox.warning(
-                    self, "GitHub", "Choose a repository or organization first."
-                )
+                QMessageBox.warning(self, "GitHub", "Choose a repository or organization first.")
 
             return None
 
         environment = self.scope[4:] if self.scope.startswith("env:") else ""
-        app = self.scope if self.scope in ("dependabot", "codespaces") else "actions"
+        app: AppName = "actions"
+
+        if self.scope == "dependabot":
+            app = "dependabot"
+        elif self.scope == "codespaces":
+            app = "codespaces"
 
         return Target(
             owner=self.owner.kind,
@@ -321,7 +336,8 @@ class GitHubTab(QWidget):
 
     def _clear_chips(self, layout: QHBoxLayout) -> None:
         while layout.count():
-            widget = layout.takeAt(0).widget()
+            item = layout.takeAt(0)
+            widget = item.widget() if item is not None else None
 
             if widget is not None:
                 discard(widget=widget)
@@ -355,12 +371,10 @@ class GitHubTab(QWidget):
                     layout=self.kind_chips,
                     text=text,
                     checked=kind == self.kind,
-                    on_click=lambda k=kind: self.set_kind(kind=k),
+                    on_click=partial(self.set_kind, kind=kind),
                 )
 
-        scopes = scopes_for(
-            owner=self.owner, kind=self.kind, environments=self.environments
-        )
+        scopes = scopes_for(owner=self.owner, kind=self.kind, environments=self.environments)
 
         if self.scope not in [scope.key for scope in scopes]:
             self.scope = scopes[0].key
@@ -373,7 +387,7 @@ class GitHubTab(QWidget):
                     layout=self.scope_chips,
                     text=scope.label,
                     checked=scope.key == self.scope,
-                    on_click=lambda key=scope.key: self.set_scope(key=key),
+                    on_click=partial(self.set_scope, key=scope.key),
                 )
 
     def set_kind(self, kind: EntryKind) -> None:
@@ -395,18 +409,76 @@ class GitHubTab(QWidget):
     # ---- repositories and organizations
 
     def load_directory(self) -> None:
+        self.directory_generation += 1
+        generation = self.directory_generation
+        self.secret_index_loading = False
+        self.sidebar.set_secret_statuses(statuses=[])
         self.sidebar.show_note(text="Loading repositories…")
 
         def done(directory: Directory) -> None:
+
+            if generation != self.directory_generation:
+                return
+
             self.directory = directory
             self.sidebar.set_directory(directory=directory)
+            self._filter_repositories()
 
         def failed(exc: Exception) -> None:
-            first_line = str(exc).splitlines()[0]
-            self.sidebar.show_note(text=f"Could not list repositories: {first_line}")
+
+            if generation != self.directory_generation:
+                return
+
+            self.sidebar.show_note(text=f"Could not list repositories: {exc}")
+
+        self.app.run(work=load_directory, done=done, busy="Loading repositories…", failed=failed)
+
+    def _filter_repositories(self) -> None:
+
+        if self.sidebar.secret_filter.currentData() == "all" or self.secret_index_loading:
+            return
+
+        names = [name for name in self.sidebar.repository_names() if name not in self.sidebar.secret_statuses]
+
+        if not names:
+            return
+
+        generation = self.directory_generation
+        self.secret_index_loading = True
+        self.sidebar.set_secret_statuses(statuses=list(self.sidebar.secret_statuses.values()), checking=True)
+
+        def done(statuses: List[RepoSecretStatus]) -> None:
+
+            if generation != self.directory_generation:
+                return
+
+            combined = dict(self.sidebar.secret_statuses)
+
+            for status in statuses:
+                combined.setdefault(status.name, status)
+
+            self.secret_index_loading = False
+            self.sidebar.set_secret_statuses(statuses=list(combined.values()))
+            self._filter_repositories()
+
+        def failed(exc: Exception) -> None:
+
+            if generation != self.directory_generation:
+                return
+
+            self.secret_index_loading = False
+            self.sidebar.set_secret_statuses(
+                statuses=[
+                    *self.sidebar.secret_statuses.values(),
+                    *(RepoSecretStatus(name=name, error=str(exc)) for name in names),
+                ]
+            )
 
         self.app.run(
-            work=load_directory, done=done, busy="Loading repositories…", failed=failed
+            work=lambda: inspect_repositories(names=names),
+            done=done,
+            failed=failed,
+            busy="Checking repository Actions secrets…",
         )
 
     def open_owner(self, owner: Owner, keep_scope: bool = False) -> None:
@@ -423,6 +495,7 @@ class GitHubTab(QWidget):
         self.entries = []
         self.show_header()
         self.sidebar.select(owner=owner)
+        self._filter_repositories()
         self.rebuild_chips()
         self.app.save_settings()
 
@@ -463,6 +536,16 @@ class GitHubTab(QWidget):
         self.stack.setCurrentIndex(LOADING)
 
         def done(entries: list[Entry]) -> None:
+            if (
+                target.owner == "repo"
+                and target.kind == "secret"
+                and target.app == "actions"
+                and not target.environment
+            ):
+                statuses = dict(self.sidebar.secret_statuses)
+                statuses[target.name] = RepoSecretStatus(name=target.name, count=len(entries))
+                self.sidebar.set_secret_statuses(statuses=list(statuses.values()), checking=self.secret_index_loading)
+
             if self.target(quiet=True) != target:
                 return
 
@@ -472,9 +555,7 @@ class GitHubTab(QWidget):
 
         def failed(exc: Exception) -> None:
             if self.target(quiet=True) == target:
-                self.loading.show_text(
-                    title="Could not load", text=str(exc) or type(exc).__name__
-                )
+                self.loading.show_text(title="Could not load", text=str(exc) or type(exc).__name__)
 
         self.app.run(
             work=lambda: cli.list_entries(target=target),
@@ -523,9 +604,7 @@ class GitHubTab(QWidget):
         noun = "secret" if target.kind == "secret" else "variable"
 
         if text:
-            self.empty.show_text(
-                title=f"No {noun} matches", text=f"Nothing here contains “{text}”."
-            )
+            self.empty.show_text(title=f"No {noun} matches", text=f"Nothing here contains “{text}”.")
         elif target.kind == "secret":
             self.empty.show_text(
                 title="No secrets yet",
@@ -605,9 +684,7 @@ class GitHubTab(QWidget):
             return
 
         noun = "secret" if target.kind == "secret" else "variable"
-        result = self._dialog(
-            parent=self, title=f"New {noun} · {target.label()}", target=target
-        )
+        result = self._dialog(parent=self, title=f"New {noun} · {target.label()}", target=target)
 
         if result is None:
             return
@@ -637,11 +714,7 @@ class GitHubTab(QWidget):
         needs_repos = target.owner == "user" or entry.visibility == "selected"
 
         if not target.shared or not needs_repos:
-            access = (
-                Access(visibility=entry.visibility or "private")
-                if target.shared
-                else None
-            )
+            access = Access.model_validate(obj={"visibility": entry.visibility or "private"}) if target.shared else None
             self._edit_with(target=target, entry=entry, access=access)
 
             return
@@ -694,8 +767,7 @@ class GitHubTab(QWidget):
         if ConfirmDialog(
             parent=parent,
             title="Set GitHub secret",
-            text=f"Set {result.name} in {target.label()}? "
-            "A secret with the same name is overwritten.",
+            text=f"Set {result.name} in {target.label()}? A secret with the same name is overwritten.",
             ok_text="Set secret",
         ).ask():
             self.save(target=target, results=[result])
@@ -744,24 +816,18 @@ class GitHubTab(QWidget):
         names = env_names(path=path)
 
         if not names:
-            QMessageBox.warning(
-                self, "Import .env", "No variables were found in that file."
-            )
+            QMessageBox.warning(self, "Import .env", "No variables were found in that file.")
 
             return
 
         existing = {entry.name for entry in self.entries}
-        lines = [
-            f"  • {name}{'  (replaces the current value)' if name in existing else ''}"
-            for name in names
-        ]
+        lines = [f"  • {name}{'  (replaces the current value)' if name in existing else ''}" for name in names]
         file_name = os.path.basename(path)
 
         if not ConfirmDialog(
             parent=self,
             title="Import .env",
-            text=f"Set {len(names)} in {target.label()} from {file_name}:\n\n"
-            + "\n".join(lines),
+            text=f"Set {len(names)} in {target.label()} from {file_name}:\n\n" + "\n".join(lines),
             ok_text="Import",
         ).ask():
             return

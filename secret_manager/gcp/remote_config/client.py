@@ -16,9 +16,7 @@ from .models import (
     parse_template,
 )
 
-BASE_URL = (
-    "https://firebaseremoteconfig.googleapis.com/v1/projects/{project}/remoteConfig"
-)
+BASE_URL = "https://firebaseremoteconfig.googleapis.com/v1/projects/{project}/remoteConfig"
 TIMEOUT = 30
 
 
@@ -32,8 +30,7 @@ def _check(response: requests.Response) -> None:
 
     if response.status_code in (409, 412):
         raise RemoteConfigError(
-            "The template was changed elsewhere since it was loaded. "
-            "Refresh, then make your changes again."
+            "The template was changed elsewhere since it was loaded. Refresh, then make your changes again."
         )
 
     try:
@@ -41,9 +38,7 @@ def _check(response: requests.Response) -> None:
     except ValidationError:
         message = ""
 
-    raise RemoteConfigError(
-        f"HTTP {response.status_code}: {message or response.text[:500]}"
-    )
+    raise RemoteConfigError(f"HTTP {response.status_code}: {message or response.text[:500]}")
 
 
 class RemoteConfigClient:

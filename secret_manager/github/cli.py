@@ -68,10 +68,7 @@ def list_repos(owner: str = "") -> list[Repo]:
     if owner:
         args.insert(2, owner)
 
-    repos = [
-        Repo(name=item.name, full_name=item.name_with_owner)
-        for item in REPOS.validate_json(_run(args=args))
-    ]
+    repos = [Repo(name=item.name, full_name=item.name_with_owner) for item in REPOS.validate_json(_run(args=args))]
 
     return sorted(repos, key=lambda repo: repo.name.lower())
 
@@ -112,9 +109,7 @@ def list_entries(target: Target) -> list[Entry]:
 
 
 # The value goes through stdin so it never shows up in the process list
-def set_entry(
-    target: Target, name: str, value: str, access: Access | None = None
-) -> None:
+def set_entry(target: Target, name: str, value: str, access: Access | None = None) -> None:
     args = [target.kind, "set", name, *target.args()]
 
     if access is not None:

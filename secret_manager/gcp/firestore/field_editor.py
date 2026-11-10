@@ -32,11 +32,7 @@ class ScalarEditor(BaseModel):
 
 
 def _number_editor(value: Any) -> ScalarEditor:
-    start = (
-        values.format_number(value=value)
-        if values.type_of(value=value) == "number"
-        else "0"
-    )
+    start = values.format_number(value=value) if values.type_of(value=value) == "number" else "0"
     edit = QLineEdit(start)
 
     def read() -> int | float:
@@ -77,9 +73,7 @@ def _timestamp_editor(value: Any) -> ScalarEditor:
 
 
 def _geopoint_editor(value: Any) -> ScalarEditor:
-    point = (
-        value if isinstance(value, GeoPoint) else GeoPoint(latitude=0.0, longitude=0.0)
-    )
+    point = value if isinstance(value, GeoPoint) else GeoPoint(latitude=0.0, longitude=0.0)
     box = QWidget()
     layout = QHBoxLayout(box)
     layout.setContentsMargins(0, 0, 0, 0)
@@ -97,9 +91,7 @@ def _geopoint_editor(value: Any) -> ScalarEditor:
             raise ValueError("Latitude and longitude must be numbers") from exc
 
         if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-            raise ValueError(
-                "Latitude must be in [-90, 90] and longitude in [-180, 180]"
-            )
+            raise ValueError("Latitude must be in [-90, 90] and longitude in [-180, 180]")
 
         return GeoPoint(latitude=latitude, longitude=longitude)
 
@@ -237,9 +229,7 @@ class FieldRow(QWidget):
         self.rows_layout = QVBoxLayout()
         self.rows_layout.setSpacing(6)
         children.addLayout(self.rows_layout)
-        self.add_child_button = link_button(
-            text="Add field", action=lambda: self.add_child()
-        )
+        self.add_child_button = link_button(text="Add field", action=lambda: self.add_child())
         children.addWidget(self.add_child_button)
         outer.addWidget(self.children_box)
 
@@ -274,9 +264,7 @@ class FieldRow(QWidget):
             self.editor = QWidget()
             self.value_slot.addWidget(self.editor)
             self.children_box.show()
-            self.add_child_button.setText(
-                "+   Add field" if kind == "map" else "+   Add item"
-            )
+            self.add_child_button.setText("+   Add field" if kind == "map" else "+   Add item")
             items = sorted(value.items()) if kind == "map" else list(enumerate(value))
 
             for key, item in items:
@@ -289,9 +277,7 @@ class FieldRow(QWidget):
 
     def _kind_changed(self, kind: str) -> None:
         same = kind == values.type_of(value=self.original)
-        self._show(
-            kind=kind, value=self.original if same else values.default_for(kind=kind)
-        )
+        self._show(kind=kind, value=self.original if same else values.default_for(kind=kind))
 
     def add_child(self, key: str | int = "", value: Any = "") -> FieldRow:
         is_map = self.kind() == "map"
@@ -378,10 +364,6 @@ class FieldsEditor(QScrollArea):
 
     # Untouched blank rows are ignored, so a document can be created without fields
     def values(self) -> dict[str, Any]:
-        used = [
-            row
-            for row in self.rows
-            if row.name() or row.kind() != "string" or row.value() != ""
-        ]
+        used = [row for row in self.rows if row.name() or row.kind() != "string" or row.value() != ""]
 
         return collect_map(rows=used)

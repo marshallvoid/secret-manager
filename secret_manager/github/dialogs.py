@@ -23,7 +23,7 @@ from .models import VISIBILITY_LABELS, Access, EntryKind, EntryResult, OwnerKind
 NAME_HINT = "Letters, digits and _ only; names are stored in upper case."
 
 
-class EntryDialog(Dialog):
+class EntryDialog(Dialog[EntryResult]):
     def __init__(
         self,
         parent: QWidget,
@@ -45,9 +45,7 @@ class EntryDialog(Dialog):
         self.content.addWidget(QLabel("Name"))
         self.name_edit = QLineEdit(name.upper())
         self.name_edit.setEnabled(not fixed_name)
-        self.name_edit.setPlaceholderText(
-            "MY_SECRET" if kind == "secret" else "MY_VARIABLE"
-        )
+        self.name_edit.setPlaceholderText("MY_SECRET" if kind == "secret" else "MY_VARIABLE")
         self.name_edit.textEdited.connect(self._upper)
         self.name_edit.textChanged.connect(self._check_live)
         self.content.addWidget(self.name_edit)
@@ -81,9 +79,7 @@ class EntryDialog(Dialog):
 
         (self.text if fixed_name else self.name_edit).setFocus()
 
-    def _access_section(
-        self, owner: OwnerKind, access: Access, choices: list[str]
-    ) -> None:
+    def _access_section(self, owner: OwnerKind, access: Access, choices: list[str]) -> None:
         self.content.addSpacing(6)
         self.content.addWidget(QLabel("Repository access"))
 
@@ -93,9 +89,7 @@ class EntryDialog(Dialog):
             for key, label in VISIBILITY_LABELS.items():
                 self.visibility.addItem(label, key)
 
-            self.visibility.setCurrentIndex(
-                list(VISIBILITY_LABELS).index(access.visibility)
-            )
+            self.visibility.setCurrentIndex(list(VISIBILITY_LABELS).index(access.visibility))
             self.visibility.currentIndexChanged.connect(lambda _: self._sync_repos())
             self.content.addWidget(self.visibility)
 
@@ -110,17 +104,13 @@ class EntryDialog(Dialog):
             item = QListWidgetItem(full_name, self.repos)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             checked = full_name in access.repos
-            item.setCheckState(
-                Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
-            )
+            item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
 
         self.content.addWidget(self.repos)
         self._sync_repos()
 
     def _sync_repos(self) -> None:
-        selected = (
-            self.visibility is None or self.visibility.currentData() == "selected"
-        )
+        selected = self.visibility is None or self.visibility.currentData() == "selected"
 
         if self.repo_filter is not None:
             self.repo_filter.setVisible(selected)
@@ -157,9 +147,7 @@ class EntryDialog(Dialog):
             return None
 
         items = [self.repos.item(index) for index in range(self.repos.count())]
-        checked = [
-            item.text() for item in items if item.checkState() == Qt.CheckState.Checked
-        ]
+        checked = [item.text() for item in items if item.checkState() == Qt.CheckState.Checked]
 
         if self.visibility is None:
             return Access(visibility="selected", repos=checked)

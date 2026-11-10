@@ -19,7 +19,10 @@ STATE_COLORS: dict[str, str] = {
 
 # Runs after the click, since the list is rebuilt when the change lands
 def later(action: Callable[[], None]) -> Callable[[bool], None]:
-    return lambda _=False: QTimer.singleShot(0, action)
+    def delayed(_checked: bool = False) -> None:
+        QTimer.singleShot(0, action)
+
+    return delayed
 
 
 class VersionRow(QWidget):
@@ -43,9 +46,7 @@ class VersionRow(QWidget):
             layout.addWidget(badge(text="latest", color=theme.ACCENT))
 
         state = version.state
-        layout.addWidget(
-            badge(text=state.title(), color=STATE_COLORS.get(state, theme.MUTED))
-        )
+        layout.addWidget(badge(text=state.title(), color=STATE_COLORS.get(state, theme.MUTED)))
         layout.addStretch(1)
 
         created = muted(text=relative_time(value=version.created, prefix="Created"))

@@ -76,14 +76,10 @@ class DocumentPanel(Panel):
                 text="Add similar document",
                 action=lambda: browser.add_similar(doc_path=path),
             ),
-            MenuItem(
-                text="Copy document path", action=lambda: browser.copy_text(text=path)
-            ),
+            MenuItem(text="Copy document path", action=lambda: browser.copy_text(text=path)),
             MenuItem(
                 text="Refresh",
-                action=lambda: browser.invalidate(
-                    keys=[NodeKey(kind="document", path=path)]
-                ),
+                action=lambda: browser.invalidate(keys=[NodeKey(kind="document", path=path)]),
             ),
             SEPARATOR,
             MenuItem(
@@ -110,11 +106,7 @@ class DocumentPanel(Panel):
         self.body.addWidget(start)
 
         if snapshot.subcollections:
-            self.body.addWidget(
-                self.item_list(
-                    ids=snapshot.subcollections, on_click=self.open_child, max_rows=6
-                )
-            )
+            self.body.addWidget(self.item_list(ids=snapshot.subcollections, on_click=self.open_child, max_rows=6))
 
         self.body.addWidget(separator())
         self.body.addWidget(
@@ -161,9 +153,7 @@ class DocumentPanel(Panel):
         tree.itemExpanded.connect(lambda item: expanded.add(self._key(item=item)))
         tree.itemCollapsed.connect(lambda item: expanded.discard(self._key(item=item)))
         tree.itemEntered.connect(lambda item, _column: self.hover(item=item))
-        tree.itemDoubleClicked.connect(
-            lambda item, _column: self._later(action=self.browser.edit_field, item=item)
-        )
+        tree.itemDoubleClicked.connect(lambda item, _column: self._later(action=self.browser.edit_field, item=item))
         tree.viewport().installEventFilter(HoverFilter(panel=self))
         tree.verticalScrollBar().valueChanged.connect(lambda _: self.unhover())
         tree.itemExpanded.connect(lambda _: self.unhover())
@@ -191,13 +181,9 @@ class DocumentPanel(Panel):
 
         if kind in values.CONTAINERS:
             item.setText(0, str(key))
-            item.setText(
-                1, values.preview(value=value, limit=200) if kind == "array" else ""
-            )
+            item.setText(1, values.preview(value=value, limit=200) if kind == "array" else "")
             item.setForeground(1, QColor(theme.MUTED))
-            children = (
-                sorted(value.items()) if kind == "map" else list(enumerate(value))
-            )
+            children = sorted(value.items()) if kind == "map" else list(enumerate(value))
 
             for child_key, child in children:
                 self._add(
@@ -240,24 +226,16 @@ class DocumentPanel(Panel):
         layout.addWidget(muted(text=f"({kind})"))
 
         if kind in values.CONTAINERS:
-            add = flat_button(
-                icon="add", tip="Add field" if kind == "map" else "Add item"
-            )
-            add.clicked.connect(
-                lambda _=False: self._later(action=self.browser.add_child, item=item)
-            )
+            add = flat_button(icon="add", tip="Add field" if kind == "map" else "Add item")
+            add.clicked.connect(lambda _=False: self._later(action=self.browser.add_child, item=item))
             layout.addWidget(add)
 
         edit = flat_button(icon="edit", tip="Edit field")
-        edit.clicked.connect(
-            lambda _=False: self._later(action=self.browser.edit_field, item=item)
-        )
+        edit.clicked.connect(lambda _=False: self._later(action=self.browser.edit_field, item=item))
         layout.addWidget(edit)
 
         delete = flat_button(icon="delete", tip="Delete field")
-        delete.clicked.connect(
-            lambda _=False: self._later(action=self.browser.delete_field, item=item)
-        )
+        delete.clicked.connect(lambda _=False: self._later(action=self.browser.delete_field, item=item))
         layout.addWidget(delete)
 
         rect = self.tree.visualItemRect(item)
@@ -288,9 +266,7 @@ class DocumentPanel(Panel):
         kind = values.type_of(value=value)
         browser = self.browser
         menu = QMenu(self)
-        menu.addAction(
-            "Edit field…", lambda: self._later(action=browser.edit_field, item=item)
-        )
+        menu.addAction("Edit field…", lambda: self._later(action=browser.edit_field, item=item))
 
         if kind in values.CONTAINERS:
             menu.addAction(
@@ -299,12 +275,8 @@ class DocumentPanel(Panel):
             )
 
         menu.addSeparator()
-        menu.addAction(
-            "Copy value", lambda: browser.copy_value(text=values.plain(value=value))
-        )
-        menu.addAction(
-            "Copy field path", lambda: browser.copy_text(text=field_path(path=path))
-        )
+        menu.addAction("Copy value", lambda: browser.copy_value(text=values.plain(value=value)))
+        menu.addAction("Copy field path", lambda: browser.copy_text(text=field_path(path=path)))
 
         if kind == "string":
             key = path[-1] if isinstance(path[-1], str) else path[0]
@@ -318,7 +290,5 @@ class DocumentPanel(Panel):
             )
 
         menu.addSeparator()
-        menu.addAction(
-            "Delete field", lambda: self._later(action=browser.delete_field, item=item)
-        )
+        menu.addAction("Delete field", lambda: self._later(action=browser.delete_field, item=item))
         menu.exec(self.tree.viewport().mapToGlobal(pos))

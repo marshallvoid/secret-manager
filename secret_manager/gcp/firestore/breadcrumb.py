@@ -44,7 +44,8 @@ class Breadcrumb(QFrame):
         self.segments = list(segments)
 
         while self.crumbs.count():
-            widget = self.crumbs.takeAt(0).widget()
+            item = self.crumbs.takeAt(0)
+            widget = item.widget() if item is not None else None
 
             if widget is not None:
                 discard(widget=widget)
@@ -56,9 +57,7 @@ class Breadcrumb(QFrame):
             crumb.setText(segment)
             crumb.setProperty("current", index == len(segments) - 1)
             crumb.setCursor(Qt.CursorShape.PointingHandCursor)
-            crumb.clicked.connect(
-                lambda _=False, i=index: self.navigate(self.segments[: i + 1])
-            )
+            crumb.clicked.connect(lambda _=False, i=index: self.navigate(self.segments[: i + 1]))
             self.crumbs.addWidget(crumb)
 
     def _start_edit(self) -> None:

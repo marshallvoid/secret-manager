@@ -33,9 +33,7 @@ def parse_labels(text: str) -> dict[str, str]:
         key, value = key.strip(), value.strip()
 
         if not LABEL_RE.fullmatch(key):
-            raise ValueError(
-                f"Label key '{key}' must start with a lowercase letter and use a-z, 0-9, - or _."
-            )
+            raise ValueError(f"Label key '{key}' must start with a lowercase letter and use a-z, 0-9, - or _.")
 
         labels[key] = value
 
@@ -71,11 +69,9 @@ class ValueInput(QWidget):
         return self.text.toPlainText()
 
 
-class NewSecretDialog(Dialog):
+class NewSecretDialog(Dialog[NewSecret]):
     def __init__(self, parent: QWidget) -> None:
-        super().__init__(
-            parent=parent, title="Create a secret", ok_text="Create", width=680
-        )
+        super().__init__(parent=parent, title="Create a secret", ok_text="Create", width=680)
         self.content.addWidget(QLabel("Name"))
         self.id_edit = QLineEdit()
         self.id_edit.setPlaceholderText("my-secret")
@@ -86,9 +82,7 @@ class NewSecretDialog(Dialog):
 
         self.input = ValueInput()
         self.content.addWidget(self.input, 1)
-        self.content.addWidget(
-            muted(text="Leave the value empty to create the secret without a version.")
-        )
+        self.content.addWidget(muted(text="Leave the value empty to create the secret without a version."))
 
         self.content.addWidget(QLabel("Labels"))
         self.labels = QLineEdit()
@@ -118,7 +112,7 @@ class NewSecretDialog(Dialog):
         return super().ask()
 
 
-class NewVersionDialog(Dialog):
+class NewVersionDialog(Dialog[str]):
     def __init__(self, parent: QWidget, secret_id: str) -> None:
         super().__init__(
             parent=parent,
@@ -128,9 +122,7 @@ class NewVersionDialog(Dialog):
         )
         self.input = ValueInput()
         self.content.addWidget(self.input, 1)
-        self.content.addWidget(
-            muted(text="The new version becomes latest; older versions stay enabled.")
-        )
+        self.content.addWidget(muted(text="The new version becomes latest; older versions stay enabled."))
         self.input.text.setFocus()
 
     def build(self) -> str:
@@ -145,7 +137,7 @@ class NewVersionDialog(Dialog):
         return super().ask()
 
 
-class ValueDialog(Dialog):
+class ValueDialog(Dialog[bool]):
     def __init__(
         self,
         parent: QWidget,

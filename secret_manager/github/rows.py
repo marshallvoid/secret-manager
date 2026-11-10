@@ -15,7 +15,10 @@ VALUE_PREVIEW = 70
 
 # Runs after the click, since the list is rebuilt when the change lands
 def later(action: Callable[[], None]) -> Callable[[bool], None]:
-    return lambda _=False: QTimer.singleShot(0, action)
+    def delayed(_checked: bool = False) -> None:
+        QTimer.singleShot(0, action)
+
+    return delayed
 
 
 class EntryRow(QWidget):
@@ -32,9 +35,7 @@ class EntryRow(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 10, 10, 10)
         layout.setSpacing(12)
-        layout.addWidget(
-            icon_label(key="key" if kind == "secret" else "variable", size=20)
-        )
+        layout.addWidget(icon_label(key="key" if kind == "secret" else "variable", size=20))
 
         title = QLabel(entry.name)
         title.setObjectName("SecretName")

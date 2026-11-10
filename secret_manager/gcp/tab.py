@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -34,12 +35,23 @@ class GoogleTab(QWidget):
         self.app = app
         self.account: GoogleAccount | None = None
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 8, 20, 20)
+        layout.setSpacing(16)
 
+        connection = QFrame()
+        connection.setObjectName("ConnectionCard")
+        connection_layout = QVBoxLayout(connection)
+        connection_layout.setContentsMargins(16, 12, 16, 12)
+        connection_layout.setSpacing(8)
         bar = QHBoxLayout()
-        bar.addWidget(QLabel("Credentials"))
+        bar.setSpacing(12)
+        credential_label = QLabel("Service account")
+        bar.addWidget(credential_label)
         self.cred_edit = QLineEdit(app.settings.credentials)
+        self.cred_edit.setAccessibleName("Service account file path")
+        credential_label.setBuddy(self.cred_edit)
         self.cred_edit.setPlaceholderText("Path to a service account JSON file")
-        self.cred_edit.returnPressed.connect(self.connect)
+        self.cred_edit.returnPressed.connect(self.connect_service_account)
         bar.addWidget(self.cred_edit, 1)
 
         browse = QPushButton("Browse…")
@@ -48,22 +60,23 @@ class GoogleTab(QWidget):
 
         connect = QPushButton("Connect")
         connect.setObjectName("Primary")
-        connect.clicked.connect(self.connect)
+        connect.clicked.connect(self.connect_service_account)
         bar.addWidget(connect)
-        layout.addLayout(bar)
+        connection_layout.addLayout(bar)
 
-        self.account_label = muted(text="Not connected")
-        layout.addWidget(self.account_label)
+        self.account_label = muted(text="Not connected · Choose a service account to get started.")
+        self.account_label.setWordWrap(True)
+        connection_layout.addWidget(self.account_label)
+        layout.addWidget(connection)
 
         self.tabs = QTabWidget()
+        self.tabs.setAccessibleName("Google Cloud services")
         self.firestore = FirestoreTab(app=app)
         self.secrets = SecretsTab(app=app)
         self.remote_config = RemoteConfigTab(app=app)
         self.tabs.addTab(self.firestore, theme.named_icon(key="database"), "Firestore")
         self.tabs.addTab(self.secrets, theme.named_icon(key="shield"), "Secret Manager")
-        self.tabs.addTab(
-            self.remote_config, theme.named_icon(key="tune"), "Remote Config"
-        )
+        self.tabs.addTab(self.remote_config, theme.named_icon(key="tune"), "Remote Config")
         self.tabs.setCurrentIndex(app.settings.google_tab)
         self.tabs.currentChanged.connect(lambda _: app.save_settings())
         layout.addWidget(self.tabs, 1)
@@ -83,15 +96,13 @@ class GoogleTab(QWidget):
 
         if path:
             self.cred_edit.setText(path)
-            self.connect()
+            self.connect_service_account()
 
-    def connect(self) -> None:
+    def connect_service_account(self) -> None:
         path = os.path.expanduser(self.cred_edit.text().strip())
 
         if not os.path.isfile(path):
-            QMessageBox.warning(
-                self, "Credentials", "Choose a service account JSON file."
-            )
+            QMessageBox.warning(self, "Credentials", "Choose a service account JSON file.")
 
             return
 
@@ -103,6 +114,4 @@ class GoogleTab(QWidget):
             self.remote_config.connect_account(account=account)
             self.app.save_settings()
 
-        self.app.run(
-            work=lambda: load_account(path=path), done=done, busy="Reading credentials…"
-        )
+        self.app.run(work=lambda: load_account(path=path), done=done, busy="Reading credentials…")

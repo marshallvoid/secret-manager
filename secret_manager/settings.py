@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import List
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from .github.models import EntryKind, Owner
+from .github.models import EntryKind, Owner, RepositoryFilter
 
 
 # Only paths, names and choices are stored here, never secret values
@@ -21,6 +22,9 @@ class AppSettings(BaseModel):
     github_owner: Owner | None = None
     github_kind: EntryKind = "secret"
     github_scope: str = "actions"
+    github_repo_filter: RepositoryFilter = "all"
+    github_repo_search: str = ""
+    github_collapsed_sections: List[str] = Field(default_factory=list)
     # written by versions before organizations were supported
     repo: str = ""
 
@@ -48,7 +52,5 @@ def save(settings: AppSettings) -> None:
     path = settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(
-        settings.model_dump_json(indent=2, exclude={"repo"}), encoding="utf-8"
-    )
+    tmp.write_text(settings.model_dump_json(indent=2, exclude={"repo"}), encoding="utf-8")
     tmp.replace(path)

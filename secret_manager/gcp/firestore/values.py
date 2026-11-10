@@ -156,9 +156,7 @@ def preview(value: Any, limit: int = 80) -> str:
     elif kind == "array":
         text = "[" + ", ".join(preview(value=item, limit=limit) for item in value) + "]"
     elif kind == "map":
-        pairs = (
-            f"{key}: {preview(value=item, limit=limit)}" for key, item in value.items()
-        )
+        pairs = (f"{key}: {preview(value=item, limit=limit)}" for key, item in value.items())
         text = "{" + ", ".join(pairs) + "}"
     else:
         text = str(value)
@@ -220,10 +218,18 @@ def with_set(top: Any, path: KeyPath, value: Any) -> Any:
     top = copy_value(value=top)
     parent = get_at(data=top, path=path[:-1])
 
-    if isinstance(parent, list) and path[-1] == len(parent):
-        parent.append(value)
+    key = path[-1]
+
+    if isinstance(parent, list):
+        if not isinstance(key, int):
+            raise ValueError("Array paths require an integer index.")
+
+        if key == len(parent):
+            parent.append(value)
+        else:
+            parent[key] = value
     else:
-        parent[path[-1]] = value
+        parent[key] = value
 
     return top
 
@@ -236,8 +242,7 @@ def with_renamed(top: Any, path: KeyPath, new_key: str, value: Any) -> Any:
         # keep the field in the same place
         old_key = path[-1]
         items = [
-            (new_key if key == old_key else key, value if key == old_key else item)
-            for key, item in parent.items()
+            (new_key if key == old_key else key, value if key == old_key else item) for key, item in parent.items()
         ]
         parent.clear()
         parent.update(items)

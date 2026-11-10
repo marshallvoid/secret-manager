@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QTimer
@@ -148,9 +149,7 @@ class RemoteConfigTab(QWidget):
         discard_button = QPushButton("Discard all")
         discard_button.clicked.connect(self.discard_changes)
         layout.addWidget(discard_button)
-        layout.addWidget(
-            primary_button(text="Publish changes", action=self.publish, icon="upload")
-        )
+        layout.addWidget(primary_button(text="Publish changes", action=self.publish, icon="upload"))
         self.banner.hide()
 
         return self.banner
@@ -171,11 +170,7 @@ class RemoteConfigTab(QWidget):
         self.count.setObjectName("Count")
         toolbar.addWidget(self.count)
         toolbar.addStretch(1)
-        toolbar.addWidget(
-            primary_button(
-                text="Add parameter", action=lambda: self.edit_parameter(key=None)
-            )
-        )
+        toolbar.addWidget(primary_button(text="Add parameter", action=lambda: self.edit_parameter(key=None)))
         layout.addLayout(toolbar)
         layout.addWidget(separator())
 
@@ -194,23 +189,13 @@ class RemoteConfigTab(QWidget):
 
         toolbar = QHBoxLayout()
         toolbar.setContentsMargins(16, 12, 16, 10)
-        toolbar.addWidget(
-            muted(
-                text="Conditions are checked from top to bottom; the first match wins."
-            )
-        )
+        toolbar.addWidget(muted(text="Conditions are checked from top to bottom; the first match wins."))
         toolbar.addStretch(1)
-        toolbar.addWidget(
-            primary_button(
-                text="Add condition", action=lambda: self.edit_condition(name=None)
-            )
-        )
+        toolbar.addWidget(primary_button(text="Add condition", action=lambda: self.edit_condition(name=None)))
         layout.addLayout(toolbar)
         layout.addWidget(separator())
 
-        self.conditions = table(
-            headers=["Condition", "Expression", "Used by", ""], stretch=1
-        )
+        self.conditions = table(headers=["Condition", "Expression", "Used by", ""], stretch=1)
         self.conditions.itemDoubleClicked.connect(
             lambda item, _column: self.edit_condition(name=item.data(0, KEY_ROLE))
         )
@@ -261,8 +246,7 @@ class RemoteConfigTab(QWidget):
         if not ConfirmDialog(
             parent=self,
             title="Publish changes",
-            text=f"Publish {self.changes} change(s)? "
-            "Apps that fetch Remote Config get them right away.",
+            text=f"Publish {self.changes} change(s)? Apps that fetch Remote Config get them right away.",
             ok_text="Publish",
         ).ask():
             return
@@ -330,20 +314,15 @@ class RemoteConfigTab(QWidget):
         version = template.version
 
         if version is not None:
-            who = (
-                f" by {version.update_user.email}" if version.update_user.email else ""
-            )
+            who = f" by {version.update_user.email}" if version.update_user.email else ""
             published = relative_time(value=version.update_time, prefix="published")
-            self.version_label.setText(
-                f"Version {version.version_number} · {published}{who}"
-            )
+            self.version_label.setText(f"Version {version.version_number} · {published}{who}")
         else:
             self.version_label.setText("No published template yet")
 
         self.banner.setVisible(self.changes > 0)
         self.banner_text.setText(
-            f"{self.changes} unpublished change(s). "
-            "Apps keep the published template until you publish."
+            f"{self.changes} unpublished change(s). Apps keep the published template until you publish."
         )
         self.paint_parameters()
         self.paint_conditions()
@@ -358,9 +337,7 @@ class RemoteConfigTab(QWidget):
         shown = [
             param
             for param in template.parameters
-            if text in param.key.lower()
-            or text in param.description.lower()
-            or text in param.group.lower()
+            if text in param.key.lower() or text in param.description.lower() or text in param.group.lower()
         ]
         total = len(template.parameters)
         self.count.setText(f"{len(shown)} of {total}" if text else str(total))
@@ -373,9 +350,7 @@ class RemoteConfigTab(QWidget):
             if param.group:
                 if param.group not in groups:
                     description = template.groups.get(param.group, "")
-                    groups[param.group] = self._group_item(
-                        name=param.group, description=description
-                    )
+                    groups[param.group] = self._group_item(name=param.group, description=description)
 
                 parent = groups[param.group]
 
@@ -396,25 +371,16 @@ class RemoteConfigTab(QWidget):
 
         return item
 
-    def _param_item(
-        self, parent: QTreeWidget | QTreeWidgetItem, param: Parameter
-    ) -> None:
-        default = (
-            param.default.describe() if param.default is not None else "(no default)"
-        )
+    def _param_item(self, parent: QTreeWidget | QTreeWidgetItem, param: Parameter) -> None:
+        default = param.default.describe() if param.default is not None else "(no default)"
         conditional = ", ".join(param.conditional)
-        item = QTreeWidgetItem(
-            parent, [param.key, default, conditional, param.value_type.title(), ""]
-        )
+        item = QTreeWidgetItem(parent, [param.key, default, conditional, param.value_type.title(), ""])
         item.setData(0, KEY_ROLE, param.key)
         item.setToolTip(0, param.description or param.key)
         item.setToolTip(1, default[:2000])
         item.setToolTip(
             2,
-            "\n".join(
-                f"{name}: {value.describe()[:200]}"
-                for name, value in param.conditional.items()
-            ),
+            "\n".join(f"{name}: {value.describe()[:200]}" for name, value in param.conditional.items()),
         )
         key = param.key
         actions = row_actions(
@@ -442,8 +408,8 @@ class RemoteConfigTab(QWidget):
             item.setData(0, KEY_ROLE, name)
             item.setToolTip(1, condition.expression)
             actions = row_actions(
-                on_edit=lambda name=name: self.edit_condition(name=name),
-                on_delete=lambda name=name: self.delete_condition(name=name),
+                on_edit=partial(self.edit_condition, name=name),
+                on_delete=partial(self.delete_condition, name=name),
             )
             self.conditions.setItemWidget(item, 3, actions)
 
@@ -487,12 +453,8 @@ class RemoteConfigTab(QWidget):
         if template is None:
             return
 
-        if ConfirmDialog(
-            parent=self, title="Delete parameter", text=f"Delete the parameter {key}?"
-        ).ask():
-            template.parameters = [
-                param for param in template.parameters if param.key != key
-            ]
+        if ConfirmDialog(parent=self, title="Delete parameter", text=f"Delete the parameter {key}?").ask():
+            template.parameters = [param for param in template.parameters if param.key != key]
             self._changed()
 
     def edit_condition(self, name: str | None) -> None:
@@ -502,9 +464,7 @@ class RemoteConfigTab(QWidget):
             return
 
         original = next((c for c in template.conditions if c.name == name), None)
-        result = ConditionDialog(
-            parent=self, template=template, condition=original
-        ).ask()
+        result = ConditionDialog(parent=self, template=template, condition=original).ask()
 
         if result is None:
             return
@@ -523,9 +483,7 @@ class RemoteConfigTab(QWidget):
         if template is None:
             return
 
-        users = [
-            param.key for param in template.parameters if name in param.conditional
-        ]
+        users = [param.key for param in template.parameters if name in param.conditional]
         detail = f" Its values are removed from: {', '.join(users)}." if users else ""
 
         if ConfirmDialog(

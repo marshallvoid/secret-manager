@@ -10,7 +10,7 @@ NodeKind = Literal["root", "collection", "document"]
 
 
 # One panel of the browser: the database, a collection or a document
-class NodeKey(BaseModel):
+class NodeKey(BaseModel, frozen=True):
     model_config = ConfigDict(frozen=True)
 
     kind: NodeKind
@@ -34,14 +34,10 @@ class Query(BaseModel):
         parts: list[str] = []
 
         if self.field:
-            parts.append(
-                f"{self.field} {self.op} {values.preview(value=self.value, limit=30)}"
-            )
+            parts.append(f"{self.field} {self.op} {values.preview(value=self.value, limit=30)}")
 
         if self.order:
-            parts.append(
-                f"order by {self.order} {'desc' if self.descending else 'asc'}"
-            )
+            parts.append(f"order by {self.order} {'desc' if self.descending else 'asc'}")
 
         return ", ".join(parts)
 

@@ -48,13 +48,15 @@ class FirestoreTab(QWidget):
         self.db_box.setEditable(True)
         self.db_box.addItems(settings.databases)
         self.db_box.setCurrentText(settings.database)
-        self.db_box.lineEdit().setPlaceholderText("(default)")
+        database_edit = self.db_box.lineEdit()
+        assert database_edit is not None
+        database_edit.setPlaceholderText("(default)")
         self.db_box.setMinimumWidth(220)
-        self.db_box.lineEdit().returnPressed.connect(self.connect)
+        database_edit.returnPressed.connect(self.connect_database)
         bar.addWidget(self.db_box)
 
         open_button = QPushButton("Open")
-        open_button.clicked.connect(self.connect)
+        open_button.clicked.connect(self.connect_database)
         bar.addWidget(open_button)
         bar.addStretch(1)
         layout.addLayout(bar)
@@ -63,9 +65,7 @@ class FirestoreTab(QWidget):
         layout.addWidget(self.browser, 1)
 
     def store_settings(self, settings: AppSettings) -> None:
-        databases = [
-            self.db_box.itemText(index) for index in range(self.db_box.count())
-        ]
+        databases = [self.db_box.itemText(index) for index in range(self.db_box.count())]
         current = self.db_box.currentText().strip()
 
         if current and current not in databases:
@@ -77,9 +77,9 @@ class FirestoreTab(QWidget):
 
     def connect_account(self, account: GoogleAccount) -> None:
         self.account = account
-        self.connect()
+        self.connect_database()
 
-    def connect(self) -> None:
+    def connect_database(self) -> None:
         account = self.account
 
         if account is None:
@@ -102,12 +102,8 @@ class FirestoreTab(QWidget):
 
         def done(opened: OpenedStore) -> None:
             self.opened = key
-            self.browser.set_store(
-                store=opened.store, root_ids=opened.root_ids, path=start
-            )
-            self.app.status(
-                text=f"Opened Firestore {opened.store.project} / {opened.store.database}"
-            )
+            self.browser.set_store(store=opened.store, root_ids=opened.root_ids, path=start)
+            self.app.status(text=f"Opened Firestore {opened.store.project} / {opened.store.database}")
 
         self.app.run(
             work=lambda: open_store(account=account, database=database),

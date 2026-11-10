@@ -15,9 +15,7 @@ class ClipboardGuard:
         QGuiApplication.clipboard().setText(text)
         self.generation += 1
         generation = self.generation
-        QTimer.singleShot(
-            seconds * 1000, lambda: self._clear(generation=generation, text=text)
-        )
+        QTimer.singleShot(seconds * 1000, lambda: self._clear(generation=generation, text=text))
 
     def _clear(self, generation: int, text: str) -> None:
         clipboard = QGuiApplication.clipboard()

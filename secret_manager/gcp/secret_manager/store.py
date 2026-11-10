@@ -21,9 +21,7 @@ def check_id(secret_id: str) -> str | None:
 
 def _replication(secret: secretmanager.Secret) -> str:
     if "user_managed" in secret.replication:
-        locations = [
-            replica.location for replica in secret.replication.user_managed.replicas
-        ]
+        locations = [replica.location for replica in secret.replication.user_managed.replicas]
 
         return "User managed: " + ", ".join(locations)
 
@@ -35,9 +33,7 @@ class SecretStore:
     def __init__(self, account: GoogleAccount) -> None:
         self.project = account.project
         self.parent = f"projects/{account.project}"
-        self.client = secretmanager.SecretManagerServiceClient(
-            credentials=account.credentials
-        )
+        self.client = secretmanager.SecretManagerServiceClient(credentials=account.credentials)
 
     def _name(self, secret_id: str) -> str:
         return f"{self.parent}/secrets/{secret_id}"
@@ -47,11 +43,13 @@ class SecretStore:
 
     def list_secrets(self) -> list[SecretInfo]:
         secrets = [
-            SecretInfo(
-                id=secret.name.rsplit("/", 1)[-1],
-                created=secret.create_time,
-                replication=_replication(secret=secret),
-                labels=dict(secret.labels),
+            SecretInfo.model_validate(
+                obj={
+                    "id": secret.name.rsplit("/", 1)[-1],
+                    "created": secret.create_time,
+                    "replication": _replication(secret=secret),
+                    "labels": dict(secret.labels),
+                }
             )
             for secret in self.client.list_secrets(request={"parent": self.parent})
         ]
@@ -62,10 +60,12 @@ class SecretStore:
     def list_versions(self, secret_id: str) -> list[VersionInfo]:
         request = {"parent": self._name(secret_id=secret_id)}
         versions = [
-            VersionInfo(
-                number=version.name.rsplit("/", 1)[-1],
-                state=secretmanager.SecretVersion.State(version.state).name,
-                created=version.create_time,
+            VersionInfo.model_validate(
+                obj={
+                    "number": version.name.rsplit("/", 1)[-1],
+                    "state": secretmanager.SecretVersion.State(version.state).name,
+                    "created": version.create_time,
+                }
             )
             for version in self.client.list_secret_versions(request=request)
         ]
@@ -95,13 +95,9 @@ class SecretStore:
 
     def add_version(self, secret_id: str, value: str) -> None:
         payload = {"data": value.encode("utf-8")}
-        self.client.add_secret_version(
-            request={"parent": self._name(secret_id=secret_id), "payload": payload}
-        )
+        self.client.add_secret_version(request={"parent": self._name(secret_id=secret_id), "payload": payload})
 
-    def change_version(
-        self, secret_id: str, version: str, action: VersionAction
-    ) -> None:
+    def change_version(self, secret_id: str, version: str, action: VersionAction) -> None:
         request = {"name": self._version_name(secret_id=secret_id, version=version)}
         methods: dict[str, Callable[..., Any]] = {
             "enable": self.client.enable_secret_version,

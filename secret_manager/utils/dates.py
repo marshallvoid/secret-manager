@@ -25,9 +25,7 @@ def parse_time(value: str | datetime.datetime | None) -> datetime.datetime | Non
         return None
 
 
-def relative_time(
-    value: str | datetime.datetime | None, prefix: str = "Updated"
-) -> str:
+def relative_time(value: str | datetime.datetime | None, prefix: str = "Updated") -> str:
     when = parse_time(value=value)
 
     if when is None:

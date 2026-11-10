@@ -7,19 +7,23 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLineEdit,
     QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from . import theme
+from .widgets_links import LinkLabel
 
 
 class MenuItem(BaseModel):
@@ -51,6 +55,7 @@ def flat_button(text: str = "", icon: str | None = None, tip: str = "") -> QTool
         button.setText(text)
 
     button.setToolTip(tip)
+    button.setAccessibleName(tip or text or icon or "Action")
     button.setIconSize(QSize(22, 22))
     button.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -74,7 +79,7 @@ def menu_button(parent: QWidget, items: list[MenuItem]) -> QToolButton:
 
 
 def muted(text: str) -> QLabel:
-    label = QLabel(text)
+    label = LinkLabel(text=text)
     label.setObjectName("Muted")
 
     return label
@@ -87,7 +92,7 @@ def icon_label(key: str, size: int, color: str = theme.MUTED) -> QLabel:
     return label
 
 
-def link_button(text: str, action: Callable[[], None]) -> QPushButton:
+def link_button(text: str, action: Callable[[], object]) -> QPushButton:
     button = QPushButton(f"+   {text}")
     button.setObjectName("Link")
     button.setFlat(True)
@@ -96,9 +101,7 @@ def link_button(text: str, action: Callable[[], None]) -> QPushButton:
     return button
 
 
-def primary_button(
-    text: str, action: Callable[[], None], icon: str = "add"
-) -> QPushButton:
+def primary_button(text: str, action: Callable[[], None], icon: str = "add") -> QPushButton:
     button = QPushButton(f"  {text}")
     button.setObjectName("Primary")
     button.setIcon(theme.named_icon(key=icon, color=theme.BG))
@@ -111,10 +114,9 @@ def search_box(placeholder: str) -> QLineEdit:
     edit = QLineEdit()
     edit.setObjectName("Search")
     edit.setPlaceholderText(placeholder)
+    edit.setAccessibleName(placeholder)
     edit.setClearButtonEnabled(True)
-    edit.addAction(
-        theme.named_icon(key="search"), QLineEdit.ActionPosition.LeadingPosition
-    )
+    edit.addAction(theme.named_icon(key="search"), QLineEdit.ActionPosition.LeadingPosition)
 
     return edit
 
@@ -188,10 +190,23 @@ class MessagePage(QWidget):
         action: Callable[[], None] | None = None,
     ) -> None:
         super().__init__()
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self.message_scroll = QScrollArea()
+        self.message_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.message_scroll.setWidgetResizable(True)
+        self.message_scroll.setAccessibleName("Message details")
+        self.content = QWidget()
+        self.message_scroll.setWidget(self.content)
+        outer.addWidget(self.message_scroll)
+
+        layout = QVBoxLayout(self.content)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(16)
         layout.addStretch(1)
 
-        art = icon_label(key=icon, size=56)
+        art = icon_label(key=icon, size=56, color=theme.ACCENT)
         art.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(art)
 
@@ -203,8 +218,14 @@ class MessagePage(QWidget):
         self.body = muted(text=text)
         self.body.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.body.setWordWrap(True)
-        self.body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        layout.addWidget(self.body)
+        self.body.setMaximumWidth(640)
+        body_row = QHBoxLayout()
+        body_row.setContentsMargins(0, 0, 0, 0)
+        body_row.setSpacing(0)
+        body_row.addStretch(1)
+        body_row.addWidget(self.body, 100)
+        body_row.addStretch(1)
+        layout.addLayout(body_row)
 
         if action is not None:
             row = QHBoxLayout()
@@ -214,7 +235,7 @@ class MessagePage(QWidget):
             layout.addSpacing(8)
             layout.addLayout(row)
 
-        layout.addStretch(2)
+        layout.addStretch(1)
 
     def show_text(self, title: str, text: str = "") -> None:
         self.heading.setText(title)

@@ -34,6 +34,19 @@ if TYPE_CHECKING:
 PanelData = list[str] | Snapshot
 
 
+class FilterLabel(QLabel):
+    def __init__(self, text: str, on_clear: Callable[[], None]) -> None:
+        super().__init__(text)
+        self.on_clear = on_clear
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.on_clear()
+
+        super().mousePressEvent(event)
+
+
 class Panel(QFrame):
     def __init__(
         self,
@@ -91,9 +104,7 @@ class Panel(QFrame):
 
         for tree in self.findChildren(QTreeWidget):
             tree.ensurePolished()
-            fields = (
-                tree.sizeHintForColumn(0) + min(tree.sizeHintForColumn(1), 320) + 48
-            )
+            fields = tree.sizeHintForColumn(0) + min(tree.sizeHintForColumn(1), 320) + 48
             width = max(width, fields)
 
         return max(width, 220)
@@ -146,9 +157,10 @@ class Panel(QFrame):
     def clear_body(self) -> None:
         while self.body.count():
             item = self.body.takeAt(0)
+            widget = item.widget() if item is not None else None
 
-            if item.widget() is not None:
-                discard(widget=item.widget())
+            if widget is not None:
+                discard(widget=widget)
 
     def show_error(self, text: str) -> None:
         self.clear_body()
@@ -210,20 +222,14 @@ class CollectionPanel(Panel):
         filter_button = flat_button(tip="Filter and sort")
         color = theme.ACCENT if active else theme.MUTED
         filter_button.setIcon(theme.named_icon(key="filter", color=color))
-        filter_button.clicked.connect(
-            lambda _=False: browser.set_filter(coll_path=path)
-        )
+        filter_button.clicked.connect(lambda _=False: browser.set_filter(coll_path=path))
         self.header.row.addWidget(filter_button)
 
         items = [
-            MenuItem(
-                text="Copy collection path", action=lambda: browser.copy_text(text=path)
-            ),
+            MenuItem(text="Copy collection path", action=lambda: browser.copy_text(text=path)),
             MenuItem(
                 text="Refresh",
-                action=lambda: browser.invalidate(
-                    keys=[NodeKey(kind="collection", path=path)]
-                ),
+                action=lambda: browser.invalidate(keys=[NodeKey(kind="collection", path=path)]),
             ),
             SEPARATOR,
             MenuItem(
@@ -240,11 +246,10 @@ class CollectionPanel(Panel):
         active = query is not None and query.active
 
         if query is not None and active:
-            bar = QLabel(f"Filtered: {query.describe()}   ✕")
+            bar = FilterLabel(text=f"Filtered: {query.describe()}   ✕", on_clear=self._clear_filter)
             bar.setObjectName("FilterBar")
             bar.setCursor(Qt.CursorShape.PointingHandCursor)
             bar.setToolTip("Clear the filter")
-            bar.mousePressEvent = self._clear_filter
             self.body.addWidget(bar)
 
         add = link_button(
@@ -254,11 +259,7 @@ class CollectionPanel(Panel):
         self.body.addWidget(add)
 
         if not ids:
-            text = (
-                "No documents match this filter"
-                if active
-                else "This collection is empty"
-            )
+            text = "No documents match this filter" if active else "This collection is empty"
             self.body.addWidget(self.note(text=text))
             self.body.addStretch(1)
 
@@ -266,5 +267,5 @@ class CollectionPanel(Panel):
 
         self.body.addWidget(self.item_list(ids=ids, on_click=self.open_child), 1)
 
-    def _clear_filter(self, _event: QMouseEvent) -> None:
+    def _clear_filter(self) -> None:
         self.browser.clear_filter(coll_path=self.path)

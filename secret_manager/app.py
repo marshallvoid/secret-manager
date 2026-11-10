@@ -7,12 +7,13 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget, QVBoxLayout, QWidget
 
 from . import settings, theme
 from .gcp.tab import GoogleTab
 from .github.tab import GitHubTab
 from .settings import AppSettings
+from .workspace import WorkspaceHeader
 
 
 class Job(BaseModel):
@@ -40,7 +41,7 @@ class Runner(QObject):
         def target() -> None:
             try:
                 outcome = Outcome(job=job, ok=True, result=job.work())
-            except Exception as exc:  # noqa: BLE001 - every failure is shown to the user
+            except Exception as exc:
                 outcome = Outcome(job=job, ok=False, result=exc)
 
             self.finished.emit(outcome)
@@ -61,6 +62,9 @@ class App(QMainWindow):
         self.tabs: QTabWidget | None = None
 
         tabs = QTabWidget()
+        tabs.setObjectName("Providers")
+        tabs.setDocumentMode(True)
+        tabs.setAccessibleName("Cloud providers")
         self.google = GoogleTab(app=self)
         self.github = GitHubTab(app=self)
         tabs.addTab(self.google, theme.named_icon(key="database"), "Google Cloud")
@@ -68,11 +72,17 @@ class App(QMainWindow):
         tabs.setCurrentIndex(self.settings.tab)
         tabs.currentChanged.connect(lambda _: self.save_settings())
         self.tabs = tabs
-        self.setCentralWidget(tabs)
+        workspace = QWidget()
+        layout = QVBoxLayout(workspace)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(WorkspaceHeader())
+        layout.addWidget(tabs, 1)
+        self.setCentralWidget(workspace)
         self.status(text="Ready")
 
         if self.google.cred_edit.text():
-            QTimer.singleShot(0, self.google.connect)
+            QTimer.singleShot(0, self.google.connect_service_account)
 
     def status(self, text: str) -> None:
         self.statusBar().showMessage(text)
@@ -112,7 +122,7 @@ class App(QMainWindow):
                 self.status(text=f"Error: {message.splitlines()[0]}")
             else:
                 self.error(exc=outcome.result)
-        except Exception as exc:  # noqa: BLE001 - a broken callback must not kill the app
+        except Exception as exc:
             self.error(exc=exc)
 
     def save_settings(self) -> None:

@@ -102,17 +102,11 @@ class Store:
 
         if query.field:
             value = values.resolve(value=query.value, client=self.client)
-            condition = FieldFilter(
-                field_path=query.field, op_string=OPERATORS[query.op], value=value
-            )
+            condition = FieldFilter(field_path=query.field, op_string=OPERATORS[query.op], value=value)
             ordered = ordered.where(filter=condition)
 
         if query.order:
-            direction = (
-                firestore.Query.DESCENDING
-                if query.descending
-                else firestore.Query.ASCENDING
-            )
+            direction = firestore.Query.DESCENDING if query.descending else firestore.Query.ASCENDING
             ordered = ordered.order_by(query.order, direction=direction)
 
         ids_only = ordered.select([FieldPath.document_id()])
@@ -124,9 +118,7 @@ class Store:
         snap = ref.get()
         subcollections = sorted(child.id for child in ref.collections())
 
-        return Snapshot(
-            exists=snap.exists, data=snap.to_dict() or {}, subcollections=subcollections
-        )
+        return Snapshot(exists=snap.exists, data=snap.to_dict() or {}, subcollections=subcollections)
 
     def create_document(self, coll_path: str, doc_id: str, data: dict[str, Any]) -> str:
         ref = self.client.collection(coll_path).document(doc_id)
@@ -136,16 +128,14 @@ class Store:
         except google_errors.AlreadyExists as exc:
             raise StoreError(f"Document {doc_id} already exists.") from exc
 
-        return ref.path
+        return str(ref.path)
 
     # changes: top-level field name → new value, or DELETE
     def update_fields(self, doc_path: str, changes: dict[str, Any]) -> None:
         ref = self.client.document(doc_path)
         payload = {
             _field(name=name): (
-                firestore.DELETE_FIELD
-                if value is DELETE
-                else values.resolve(value=value, client=self.client)
+                firestore.DELETE_FIELD if value is DELETE else values.resolve(value=value, client=self.client)
             )
             for name, value in changes.items()
         }

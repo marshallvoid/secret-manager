@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 OwnerKind = Literal["repo", "org", "user"]
 EntryKind = Literal["secret", "variable"]
+RepositoryFilter = Literal["all", "with", "without", "unknown"]
 AppName = Literal["actions", "dependabot", "codespaces"]
 Visibility = Literal["all", "private", "selected"]
 
@@ -21,28 +22,28 @@ VISIBILITY_LABELS: dict[str, str] = {
 }
 
 
-class Frozen(BaseModel):
+class Frozen(BaseModel, frozen=True):
     model_config = ConfigDict(frozen=True)
 
 
-class Repo(Frozen):
+class Repo(Frozen, frozen=True):
     name: str
     full_name: str
 
 
-class Owner(Frozen):
+class Owner(Frozen, frozen=True):
     kind: OwnerKind
     # owner/repo for a repository, the login for an organization, "" for the user
     name: str
     label: str
 
 
-class Scope(Frozen):
+class Scope(Frozen, frozen=True):
     key: str
     label: str
 
 
-class Target(Frozen):
+class Target(Frozen, frozen=True):
     owner: OwnerKind
     name: str
     kind: EntryKind = "secret"
@@ -83,7 +84,7 @@ class Target(Frozen):
         return f"{where} · {APP_LABELS[self.app]} {kind}"
 
 
-class Entry(Frozen):
+class Entry(Frozen, frozen=True):
     name: str
     updated: str = ""
     # only variables have a readable value
@@ -92,9 +93,7 @@ class Entry(Frozen):
     selected_count: int = 0
 
     def access_text(self) -> str:
-        selected = self.visibility == "selected" or (
-            not self.visibility and self.selected_count
-        )
+        selected = self.visibility == "selected" or (not self.visibility and self.selected_count)
 
         if selected:
             count = self.selected_count
