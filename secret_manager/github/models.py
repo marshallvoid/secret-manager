@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 OwnerKind = Literal["repo", "org", "user"]
 EntryKind = Literal["secret", "variable"]
@@ -22,28 +22,24 @@ VISIBILITY_LABELS: dict[str, str] = {
 }
 
 
-class Frozen(BaseModel, frozen=True):
-    model_config = ConfigDict(frozen=True)
-
-
-class Repo(Frozen, frozen=True):
+class Repo(BaseModel, frozen=True):
     name: str
     full_name: str
 
 
-class Owner(Frozen, frozen=True):
+class Owner(BaseModel, frozen=True):
     kind: OwnerKind
     # owner/repo for a repository, the login for an organization, "" for the user
     name: str
     label: str
 
 
-class Scope(Frozen, frozen=True):
+class Scope(BaseModel, frozen=True):
     key: str
     label: str
 
 
-class Target(Frozen, frozen=True):
+class Target(BaseModel, frozen=True):
     owner: OwnerKind
     name: str
     kind: EntryKind = "secret"
@@ -84,7 +80,7 @@ class Target(Frozen, frozen=True):
         return f"{where} · {APP_LABELS[self.app]} {kind}"
 
 
-class Entry(Frozen, frozen=True):
+class Entry(BaseModel, frozen=True):
     name: str
     updated: str = ""
     # only variables have a readable value

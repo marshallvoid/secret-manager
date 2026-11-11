@@ -39,12 +39,9 @@ def settings_path() -> Path:
 def load() -> AppSettings:
     try:
         text = settings_path().read_text(encoding="utf-8")
-    except OSError:
-        return AppSettings()
 
-    try:
         return AppSettings.model_validate_json(text)
-    except ValidationError:
+    except (OSError, ValidationError):
         return AppSettings()
 
 
