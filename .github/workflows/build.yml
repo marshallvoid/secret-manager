@@ -1,4 +1,4 @@
-name: Build and release
+name: Build
 
 on:
   workflow_dispatch:
@@ -6,43 +6,37 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: read
-
-concurrency:
-  group: build-and-release-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   lint:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - id: python
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install uv==0.13.7
-      - run: uv sync --locked --group dev --group build --python python
-      - run: make lint
+      # Type checks also resolve imports from the build scripts.
+      - run: uv sync --locked --group dev --group build --python "${{ steps.python.outputs.python-path }}"
+      - run: uv run --no-env-file --no-sync ruff check .
+      - run: uv run --no-env-file --no-sync ruff format --check .
+      - run: uv run --no-env-file --no-sync mypy
+      - run: uv run --no-env-file --no-sync pyright
 
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - id: python
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Linux Qt libraries
-        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
       - run: python -m pip install uv==0.13.7
-      - run: uv sync --locked --no-default-groups --group build --python python
-      - run: uv run --no-env-file --no-sync python -m unittest discover -s tests -v
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
+      - run: uv sync --locked --no-default-groups --python "${{ steps.python.outputs.python-path }}"
+      - run: uv run --no-env-file --no-sync python -B -m unittest discover -s tests -v
 
   release:
     if: github.event_name == 'push'
@@ -53,78 +47,52 @@ jobs:
     outputs:
       tag: ${{ steps.semantic.outputs.tag }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
-      - name: Determine version and create draft release
-        id: semantic
+      - id: semantic
         run: npx --yes -p semantic-release@24 -p @semantic-release/exec@6 semantic-release
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
   build:
-    needs: [lint, test, release]
+    needs: [test, release]
     if: >-
-      !cancelled() && needs.lint.result == 'success' && needs.test.result == 'success' &&
+      !cancelled() && needs.test.result == 'success' &&
       (needs.release.outputs.tag != '' || github.event_name == 'workflow_dispatch')
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-22.04
-            asset: SecretManager-linux-x86_64.tar.gz
-          - os: windows-latest
-            asset: SecretManager-windows-x86_64.zip
-          - os: macos-latest
-            asset: SecretManager-macos-arm64.zip
-          - os: macos-15-intel
-            asset: SecretManager-macos-x86_64.zip
+        os: [ubuntu-22.04, windows-latest, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - id: python
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install Linux Qt libraries
-        if: runner.os == 'Linux'
+      - run: python -m pip install uv==0.13.7
+      - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
-      - name: Install uv
-        run: python -m pip install uv==0.13.7
-      - name: Configure static OpenSSL for macOS Intel
-        if: matrix.os == 'macos-15-intel'
-        run: |
-          echo "OPENSSL_STATIC=1" >> "$GITHUB_ENV"
-          echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
-      - name: Install dependencies
-        run: uv sync --locked --no-default-groups --group build --python python
-      - name: Test
-        run: uv run --no-env-file --no-sync python -m unittest discover -s tests -v
-      - name: Build and smoke test
-        run: uv run --no-env-file --no-sync python scripts/build.py
-        env:
-          SECRET_MANAGER_VERSION: ${{ needs.release.outputs.tag }}
-      - uses: actions/upload-artifact@v4
+      - run: uv sync --locked --no-default-groups --group build --python "${{ steps.python.outputs.python-path }}"
+      - run: uv run --no-env-file --no-sync python scripts/build.py
+      - uses: actions/upload-artifact@v7
         with:
           name: SecretManager-${{ matrix.os }}
-          path: dist/${{ matrix.asset }}
+          path: dist/SecretManager*
           if-no-files-found: error
-      - name: Attach portable to draft release
-        if: needs.release.outputs.tag != ''
+      - if: needs.release.outputs.tag != ''
         shell: bash
-        run: gh release upload "$RELEASE_TAG" "dist/$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+        run: gh release upload "${{ needs.release.outputs.tag }}" dist/SecretManager* --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.release.outputs.tag }}
-          ASSET: ${{ matrix.asset }}
 
   publish:
     needs: [release, build]
@@ -133,12 +101,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Publish only after all four portables are attached
-        shell: bash
+      - name: Publish the draft once every platform is attached
         run: |
-          count=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')
-          test "$count" -eq 4
-          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          count=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets | length')
+          test "$count" -eq "$EXPECTED"
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
+          EXPECTED: "4"

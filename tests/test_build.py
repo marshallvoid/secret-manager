@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import sys
-import tarfile
 import unittest
-import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from pydantic import ValidationError
 
-from scripts.build_support.archive import archive, stage
+from scripts.build_support.package import package
 from scripts.build_support.targets import binary_path, current_target
 
 
@@ -28,65 +26,53 @@ class BuildTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             current_target(system="Linux", machine="unsupported")
 
-    def test_staging_only_includes_build_output_and_notices(self) -> None:
+    def test_executables_are_published_without_sidecar_files(self) -> None:
 
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            output = root / "output"
-            target = current_target(system="Windows", machine="AMD64")
-            executable = binary_path(output=output, target=target)
-            executable.parent.mkdir(parents=True)
-            executable.write_bytes(data=b"synthetic executable")
-            (root / "unrelated.txt").write_text(data="Do not package workspace files", encoding="utf-8")
-            package = root / target.name
-            stage(
-                output=output,
-                destination=package,
-                target=target,
-                notices="Synthetic notices",
-                version="1.2.3",
-            )
-            destination = root / "portable.zip"
-            archive(source=package, destination=destination, target=target)
+        for system in ["Linux", "Windows"]:
+            with self.subTest(system=system), TemporaryDirectory() as directory:
+                root = Path(directory)
+                output = root / "output"
+                output.mkdir()
+                target = current_target(system=system, machine="x86_64")
+                executable = binary_path(output=output, target=target)
+                executable.write_bytes(data=b"synthetic executable")
+                executable.chmod(mode=0o755)
+                (output / "README.txt").write_text(data="Do not package", encoding="utf-8")
+                destination = root / f"{target.name}{target.extension}"
+                package(output=output, destination=destination, target=target)
+                self.assertEqual(destination.read_bytes(), b"synthetic executable")
+                self.assertFalse(executable.exists())
+                self.assertEqual(sorted(path.name for path in root.iterdir()), [destination.name, "output"])
 
-            with zipfile.ZipFile(file=destination) as result:
-                names = result.namelist()
-                self.assertEqual(result.read(name=f"{target.name}/VERSION"), b"1.2.3\n")
+                if sys.platform != "win32":
+                    self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
 
-            self.assertIn(f"{target.name}/SecretManager/SecretManager.exe", names)
-            self.assertIn(f"{target.name}/THIRD_PARTY_NOTICES.txt", names)
-            self.assertFalse(any("unrelated" in name for name in names))
+    def test_macos_packages_only_app_bundle_as_disk_image(self) -> None:
+        target = current_target(system="Darwin", machine="arm64")
+        self.assertEqual(target.extension, ".dmg")
+        self.assertEqual(
+            binary_path(output=Path("output"), target=target),
+            Path("output/SecretManager.app/Contents/MacOS/SecretManager"),
+        )
 
-    @unittest.skipIf(sys.platform == "win32", "Symlink creation requires extra Windows permissions")
-    def test_linux_archive_preserves_executable_permissions_and_symlinks(self) -> None:
+        with patch("scripts.build_support.package.subprocess.run") as run:
+            package(output=Path("output"), destination=Path("portable.dmg"), target=target)
 
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "portable"
-            source.mkdir()
-            executable = source / "app"
-            executable.write_bytes(data=b"synthetic executable")
-            executable.chmod(mode=0o755)
-            link = source / "app-link"
-            link.symlink_to(target="app")
-            destination = root / "portable.tar.gz"
-            archive(source=source, destination=destination, target=current_target(system="Linux", machine="x86_64"))
-
-            with tarfile.open(name=destination) as result:
-                self.assertEqual(result.getmember(name="portable/app").mode, 0o755)
-                self.assertTrue(result.getmember(name="portable/app-link").issym())
-
-    def test_macos_archive_preserves_app_bundle_with_ditto(self) -> None:
-
-        with patch("scripts.build_support.archive.subprocess.run") as run:
-            archive(
-                source=Path("portable"),
-                destination=Path("portable.zip"),
-                target=current_target(system="Darwin", machine="arm64"),
-            )
-
-        self.assertIn("--keepParent", run.call_args.kwargs["args"])
-        self.assertTrue(run.call_args.kwargs["check"])
+        run.assert_called_once_with(
+            args=[
+                "hdiutil",
+                "create",
+                "-volname",
+                "SecretManager",
+                "-srcfolder",
+                str(Path("output/SecretManager.app")),
+                "-format",
+                "UDZO",
+                "-ov",
+                "portable.dmg",
+            ],
+            check=True,
+        )
 
 
 if __name__ == "__main__":

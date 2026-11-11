@@ -30,7 +30,7 @@ uv run secret-manager
 | `make check` | Run lint and tests |
 | `make format` | Apply Ruff fixes and formatting |
 | `make hooks` | Install local pre-commit hooks (Python 3.11+) |
-| `make build` | Build and smoke-test a portable archive for the current platform |
+| `make build` | Build and smoke-test a portable executable or macOS disk image |
 | `make clean` | Remove generated files in `dist/` |
 
 ## Code checks
@@ -48,33 +48,34 @@ uv run secret-manager
 
 - Build with `make build`, or `uv run --no-env-file --locked --group build python scripts/build.py`.
 - Each platform builds on its own OS; cross-compilation is not supported.
-- The **Build and release** workflow builds all four targets for a release or a manual run.
-- Extract the whole archive before running; Python is bundled.
+- The **Build** workflow builds all four targets for a release or a manual run.
+- Windows/Linux: run the downloaded executable; on Linux, run `chmod +x` on it first.
+- macOS: open the disk image and copy `SecretManager.app` to Applications.
+- Python is bundled on every platform.
 - GitHub features still require `gh` installed on `PATH` and signed in.
 - Google Cloud features use a service account file selected by the user.
-- Builds include compiled application files and dependency notices, without user settings or credentials.
+- Release assets contain the application without extra README, LICENSE or VERSION files.
 - Builds are unsigned; macOS builds are not notarized.
 - Linux builds require compatible system libraries; the workflow uses Ubuntu 22.04.
 - The smoke test checks Qt and cloud imports without loading user settings or credentials.
-- Each archive includes a `VERSION` file: the release version, or the project version for a local/manual build.
 
-| Platform | Archive | Open after extraction |
-|---|---|---|
-| Linux x86_64 | `dist/SecretManager-linux-x86_64.tar.gz` | `SecretManager/SecretManager` |
-| Windows x86_64 | `dist/SecretManager-windows-x86_64.zip` | `SecretManager/SecretManager.exe` |
-| macOS Apple Silicon | `dist/SecretManager-macos-arm64.zip` | `SecretManager.app` |
-| macOS Intel | `dist/SecretManager-macos-x86_64.zip` | `SecretManager.app` |
+| Platform | Release asset |
+|---|---|
+| Linux x86_64 | `dist/SecretManager-linux-x86_64` |
+| Windows x86_64 | `dist/SecretManager-windows-x86_64.exe` |
+| macOS Apple Silicon | `dist/SecretManager-macos-arm64.dmg` |
+| macOS Intel | `dist/SecretManager-macos-x86_64.dmg` |
 
 ## Releases
 
 - Pull requests and pushes to `main` run lint and tests.
 - After checks pass on `main`, semantic-release reads Conventional Commits and creates a version tag and draft release.
-- All four portable builds attach their archives to that draft.
-- The release becomes public and latest only after every build succeeds and all four archives are attached.
+- All four portable builds attach their assets to that draft.
+- The release becomes public and latest only after every build succeeds and all four assets are attached.
 - A failed build leaves the release as a draft.
 - Manual workflow runs build artifacts without creating a release.
 - The pipeline uses the built-in GitHub Actions token; no custom credential file is required.
-- Python package metadata keeps the source version; release builds record their tag version in `VERSION`.
+- The release tag identifies the version; Python package metadata keeps the source version.
 
 | Commit | Version change |
 |---|---|

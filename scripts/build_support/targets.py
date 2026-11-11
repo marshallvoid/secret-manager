@@ -17,7 +17,7 @@ class BuildTarget(BaseModel):
 
     @property
     def extension(self) -> str:
-        return ".tar.gz" if self.system == "linux" else ".zip"
+        return {"linux": "", "windows": ".exe", "macos": ".dmg"}[self.system]
 
 
 def current_target(system: Optional[str] = None, machine: Optional[str] = None) -> BuildTarget:
@@ -39,4 +39,4 @@ def binary_path(output: Path, target: BuildTarget) -> Path:
     if target.system == "macos":
         return output / "SecretManager.app" / "Contents" / "MacOS" / "SecretManager"
 
-    return output / "SecretManager" / ("SecretManager.exe" if target.system == "windows" else "SecretManager")
+    return output / ("SecretManager.exe" if target.system == "windows" else "SecretManager")

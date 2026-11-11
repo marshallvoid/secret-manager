@@ -10,7 +10,7 @@ help: ## Show available commands
 	@echo "make check    Run lint and tests"
 	@echo "make format   Fix Ruff issues and format Python files"
 	@echo "make hooks    Install pre-commit hooks"
-	@echo "make build    Build a portable archive for this OS and architecture"
+	@echo "make build    Build a portable executable or macOS disk image for this OS and architecture"
 	@echo "make clean    Remove generated portable builds"
 
 install: ## Install app and build dependencies
@@ -37,7 +37,7 @@ format: ## Fix lint issues and format the code
 	$(UV_RUN) ruff check --fix .
 	$(UV_RUN) ruff format .
 
-build: ## Build a portable archive
+build: ## Build a portable executable or macOS disk image
 	$(UV_RUN) python scripts/build.py
 
 clean: ## Remove generated portable builds

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import subprocess
 import sys
-from importlib import metadata
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -14,8 +12,7 @@ import PyInstaller.__main__
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.build_support.archive import archive, stage
-from scripts.build_support.licenses import third_party_notices
+from scripts.build_support.package import package
 from scripts.build_support.targets import binary_path, current_target
 
 DIST = ROOT / "dist"
@@ -41,7 +38,7 @@ def main() -> None:
             pyi_args=[
                 "--noconfirm",
                 "--windowed",
-                "--onedir",
+                "--onedir" if target.system == "macos" else "--onefile",
                 "--name",
                 "SecretManager",
                 "--paths",
@@ -70,19 +67,8 @@ def main() -> None:
             ]
         )
         subprocess.run(args=[str(binary_path(output=output, target=target)), "--smoke-test"], check=True)
-        package = work / target.name
-        version = os.environ.get("SECRET_MANAGER_VERSION") or metadata.version(distribution_name="secret-manager")
-        stage(
-            output=output,
-            destination=package,
-            target=target,
-            notices=third_party_notices(),
-            version=version.removeprefix("v"),
-        )
-        temporary_archive = work / f"{target.name}{target.extension}"
-        archive(source=package, destination=temporary_archive, target=target)
-        destination = DIST / temporary_archive.name
-        temporary_archive.replace(target=destination)
+        destination = DIST / f"{target.name}{target.extension}"
+        package(output=output, destination=destination, target=target)
 
     print(destination)
 
