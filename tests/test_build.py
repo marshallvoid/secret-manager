@@ -6,73 +6,61 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from pydantic import ValidationError
-
-from scripts.build_support.package import package
-from scripts.build_support.targets import binary_path, current_target
+from scripts import build
 
 
 class BuildTests(unittest.TestCase):
-    def test_supported_platforms_and_architectures(self) -> None:
+    def test_release_asset_names(self) -> None:
 
         for system, machine, name in [
-            ("Linux", "x86_64", "SecretManager-linux-x86_64"),
-            ("Windows", "AMD64", "SecretManager-windows-x86_64"),
-            ("Darwin", "arm64", "SecretManager-macos-arm64"),
-            ("Darwin", "x86_64", "SecretManager-macos-x86_64"),
+            ("linux", "x86_64", "SecretManager-linux-x86_64"),
+            ("win32", "AMD64", "SecretManager-windows-x86_64.exe"),
+            ("darwin", "arm64", "SecretManager-macos-arm64.dmg"),
+            ("darwin", "x86_64", "SecretManager-macos-x86_64.dmg"),
         ]:
-            self.assertEqual(current_target(system=system, machine=machine).name, name)
+            with (
+                self.subTest(system=system, machine=machine),
+                patch("scripts.build.sys.platform", system),
+                patch("scripts.build.platform.machine", return_value=machine),
+            ):
+                self.assertEqual(build.asset_name(), name)
 
-        with self.assertRaises(ValidationError):
-            current_target(system="Linux", machine="unsupported")
+    def test_packages_only_executable_and_keeps_permissions(self) -> None:
 
-    def test_executables_are_published_without_sidecar_files(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            work = root / "work"
+            output = work / "output"
+            output.mkdir(parents=True)
+            executable = output / build.NAME
+            executable.write_bytes(data=b"synthetic executable")
+            executable.chmod(mode=0o755)
+            (output / "README.txt").write_text(data="Do not package", encoding="utf-8")
 
-        for system in ["Linux", "Windows"]:
-            with self.subTest(system=system), TemporaryDirectory() as directory:
-                root = Path(directory)
-                output = root / "output"
-                output.mkdir()
-                target = current_target(system=system, machine="x86_64")
-                executable = binary_path(output=output, target=target)
-                executable.write_bytes(data=b"synthetic executable")
-                executable.chmod(mode=0o755)
-                (output / "README.txt").write_text(data="Do not package", encoding="utf-8")
-                destination = root / f"{target.name}{target.extension}"
-                package(output=output, destination=destination, target=target)
-                self.assertEqual(destination.read_bytes(), b"synthetic executable")
-                self.assertFalse(executable.exists())
-                self.assertEqual(sorted(path.name for path in root.iterdir()), [destination.name, "output"])
+            with (
+                patch.object(build, "DIST", root),
+                patch.object(build, "WORK", work),
+                patch("scripts.build.sys.platform", "linux"),
+            ):
+                destination = build.package()
 
-                if sys.platform != "win32":
-                    self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
+            self.assertEqual(destination.read_bytes(), b"synthetic executable")
+            self.assertFalse(executable.exists())
+            self.assertEqual(sorted(path.name for path in root.iterdir()), [destination.name, "work"])
 
-    def test_macos_packages_only_app_bundle_as_disk_image(self) -> None:
-        target = current_target(system="Darwin", machine="arm64")
-        self.assertEqual(target.extension, ".dmg")
-        self.assertEqual(
-            binary_path(output=Path("output"), target=target),
-            Path("output/SecretManager.app/Contents/MacOS/SecretManager"),
-        )
+            if sys.platform != "win32":
+                self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
 
-        with patch("scripts.build_support.package.subprocess.run") as run:
-            package(output=Path("output"), destination=Path("portable.dmg"), target=target)
+    def test_macos_packages_app_bundle(self) -> None:
 
-        run.assert_called_once_with(
-            args=[
-                "hdiutil",
-                "create",
-                "-volname",
-                "SecretManager",
-                "-srcfolder",
-                str(Path("output/SecretManager.app")),
-                "-format",
-                "UDZO",
-                "-ov",
-                "portable.dmg",
-            ],
-            check=True,
-        )
+        with patch("scripts.build.sys.platform", "darwin"), patch("scripts.build.subprocess.run") as run:
+            destination = build.package()
+
+        args = run.call_args.kwargs["args"]
+        self.assertEqual(args[0:2], ["hdiutil", "create"])
+        self.assertEqual(args[args.index("-srcfolder") + 1], str(build.WORK / "output" / "SecretManager.app"))
+        self.assertEqual(args[-1], str(destination))
+        self.assertTrue(run.call_args.kwargs["check"])
 
 
 if __name__ == "__main__":

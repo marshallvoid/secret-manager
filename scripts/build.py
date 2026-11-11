@@ -1,76 +1,91 @@
-from __future__ import annotations
-
-import argparse
+#!/usr/bin/env python3
+import platform
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import PyInstaller.__main__
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
-from scripts.build_support.package import package
-from scripts.build_support.targets import binary_path, current_target
-
+NAME = "SecretManager"
 DIST = ROOT / "dist"
+WORK = DIST / "work"
+
+
+def asset_name() -> str:
+    system = {"win32": "windows", "darwin": "macos"}.get(sys.platform, "linux")
+    machine = platform.machine().lower()
+    extension = {"linux": "", "win32": ".exe", "darwin": ".dmg"}[sys.platform]
+
+    return f"{NAME}-{system}-{'x86_64' if machine == 'amd64' else machine}{extension}"
+
+
+def compile_app() -> None:
+    args = [
+        "--noconfirm",
+        "--log-level",
+        "WARN",
+        "--windowed",
+        "--name",
+        NAME,
+        "--paths",
+        str(ROOT),
+        "--exclude-module",
+        "tkinter",
+        "--collect-data",
+        "certifi",
+        "--copy-metadata",
+        "google-cloud-firestore",
+        "--copy-metadata",
+        "google-cloud-secret-manager",
+        "--distpath",
+        str(WORK / "output"),
+        "--workpath",
+        str(WORK / "pyinstaller"),
+        "--specpath",
+        str(WORK),
+    ]
+
+    if sys.platform != "darwin":
+        args.append("--onefile")
+
+    PyInstaller.__main__.run(pyi_args=[*args, str(ROOT / "secret_manager" / "__main__.py")])
+
+
+def package() -> Path:
+    target = DIST / asset_name()
+    output = WORK / "output"
+
+    if sys.platform == "darwin":
+        subprocess.run(
+            args=[
+                "hdiutil",
+                "create",
+                "-volname",
+                NAME,
+                "-srcfolder",
+                str(output / f"{NAME}.app"),
+                "-format",
+                "UDZO",
+                "-ov",
+                str(target),
+            ],
+            check=True,
+        )
+    else:
+        binary = f"{NAME}.exe" if sys.platform == "win32" else NAME
+        shutil.move(src=str(output / binary), dst=str(target))
+
+    return target
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build a portable app for the current platform.")
-    parser.add_argument("--clean", action="store_true", help="Remove generated portable build output.")
-    args = parser.parse_args()
-
-    if args.clean:
-        shutil.rmtree(path=DIST, ignore_errors=True)
-
-        return
-
-    target = current_target()
-    DIST.mkdir(parents=True, exist_ok=True)
-
-    with TemporaryDirectory(prefix=".build-", dir=DIST) as directory:
-        work = Path(directory)
-        output = work / "output"
-        PyInstaller.__main__.run(
-            pyi_args=[
-                "--noconfirm",
-                "--windowed",
-                "--onedir" if target.system == "macos" else "--onefile",
-                "--name",
-                "SecretManager",
-                "--paths",
-                str(ROOT),
-                "--distpath",
-                str(output),
-                "--workpath",
-                str(work / "pyinstaller"),
-                "--specpath",
-                str(work),
-                "--exclude-module",
-                "tkinter",
-                "--exclude-module",
-                "PyQt5",
-                "--exclude-module",
-                "PyQt6",
-                "--exclude-module",
-                "PySide2",
-                "--collect-data",
-                "certifi",
-                "--copy-metadata",
-                "google-cloud-firestore",
-                "--copy-metadata",
-                "google-cloud-secret-manager",
-                str(ROOT / "scripts" / "portable_entry.py"),
-            ]
-        )
-        subprocess.run(args=[str(binary_path(output=output, target=target)), "--smoke-test"], check=True)
-        destination = DIST / f"{target.name}{target.extension}"
-        package(output=output, destination=destination, target=target)
-
-    print(destination)
+    shutil.rmtree(path=DIST, ignore_errors=True)
+    compile_app()
+    target = package()
+    shutil.rmtree(path=WORK)
+    print(target)
 
 
 if __name__ == "__main__":

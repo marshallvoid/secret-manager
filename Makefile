@@ -1,44 +1,41 @@
+VENV := .venv
+VENV_PYTHON := $(VENV)/bin/python
+VENV_READY := $(VENV)/.ready
+
 .DEFAULT_GOAL := help
-.PHONY: help install hooks run test lint check format build clean
-UV_RUN := uv run --no-env-file --locked --group build --group dev
+.PHONY: help install run check test lint format build clean
 
-help: ## Show available commands
-	@echo "make install  Install app and build dependencies"
-	@echo "make run      Open the app"
-	@echo "make test     Run tests with synthetic data"
-	@echo "make lint     Check Ruff, formatting, mypy and Pyright"
-	@echo "make check    Run lint and tests"
-	@echo "make format   Fix Ruff issues and format Python files"
-	@echo "make hooks    Install pre-commit hooks"
-	@echo "make build    Build a portable executable or macOS disk image for this OS and architecture"
-	@echo "make clean    Remove generated portable builds"
+help: ## Show this help
+	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
-install: ## Install app and build dependencies
-	uv sync --locked --group build --group dev
+$(VENV_READY): pyproject.toml uv.lock
+	uv sync --locked
+	$(VENV_PYTHON) -m pre_commit install
+	@touch $(VENV_READY)
 
-hooks: install ## Install pre-commit hooks
-	$(UV_RUN) pre-commit install
+install: $(VENV_READY) ## Create .venv with uv and install the git hook
 
-run: ## Open the app
-	$(UV_RUN) secret-manager
+run: $(VENV_READY) ## Open the app from source
+	$(VENV_PYTHON) -m secret_manager
 
-test: ## Run tests
-	$(UV_RUN) python -m unittest discover -s tests -v
+check: lint test ## Run style, type and test checks
 
-lint: ## Check style, formatting and types
-	$(UV_RUN) ruff check .
-	$(UV_RUN) ruff format --check .
-	$(UV_RUN) mypy
-	$(UV_RUN) pyright
+test: $(VENV_READY) ## Run the test suite
+	$(VENV_PYTHON) -B -m unittest discover -s tests -v
 
-check: lint test ## Run all checks
+lint: $(VENV_READY) ## Check style and types
+	$(VENV_PYTHON) -m ruff check .
+	$(VENV_PYTHON) -m ruff format --check .
+	$(VENV_PYTHON) -m mypy
+	$(VENV_PYTHON) -m pyright
 
-format: ## Fix lint issues and format the code
-	$(UV_RUN) ruff check --fix .
-	$(UV_RUN) ruff format .
+format: $(VENV_READY) ## Fix style problems and format the code
+	$(VENV_PYTHON) -m ruff check --fix .
+	$(VENV_PYTHON) -m ruff format .
 
-build: ## Build a portable executable or macOS disk image
-	$(UV_RUN) python scripts/build.py
+build: $(VENV_READY) ## Build dist/SecretManager-<platform>-<arch>
+	$(VENV_PYTHON) -B scripts/build.py
 
-clean: ## Remove generated portable builds
-	$(UV_RUN) python scripts/build.py --clean
+clean: ## Remove build output and project bytecode caches
+	rm -rf dist
+	find . -path './$(VENV)' -prune -o -name __pycache__ -type d -prune -exec rm -rf {} +

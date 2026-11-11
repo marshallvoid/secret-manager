@@ -1415,6 +1415,7 @@ wheels = [
 name = "secret-manager"
 version = "0.1.0"
 source = { editable = "." }
+default-groups = ["build", "dev"]
 dependencies = [
     { name = "google-cloud-firestore" },
     { name = "google-cloud-secret-manager" },

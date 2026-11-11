@@ -23,14 +23,13 @@ uv run secret-manager
 
 | Command | Action |
 |---|---|
-| `make install` | Install locked app, build and development dependencies with uv |
+| `make install` | Create .venv with uv and install the git hook |
 | `make run` | Open the app |
 | `make test` | Run tests using synthetic data |
 | `make lint` | Run Ruff checks, format validation, strict mypy and Pyright |
 | `make check` | Run lint and tests |
 | `make format` | Apply Ruff fixes and formatting |
-| `make hooks` | Install local pre-commit hooks (Python 3.11+) |
-| `make build` | Build and smoke-test a portable executable or macOS disk image |
+| `make build` | Build a portable executable or macOS disk image |
 | `make clean` | Remove generated files in `dist/` |
 
 ## Code checks
@@ -46,7 +45,7 @@ uv run secret-manager
 
 ## Portable builds
 
-- Build with `make build`, or `uv run --no-env-file --locked --group build python scripts/build.py`.
+- Build with `make build`, or `.venv/bin/python -B scripts/build.py`.
 - Each platform builds on its own OS; cross-compilation is not supported.
 - The **Build** workflow builds all four targets for a release or a manual run.
 - Windows/Linux: run the downloaded executable; on Linux, run `chmod +x` on it first.
@@ -57,7 +56,6 @@ uv run secret-manager
 - Release assets contain the application without extra README, LICENSE or VERSION files.
 - Builds are unsigned; macOS builds are not notarized.
 - Linux builds require compatible system libraries; the workflow uses Ubuntu 22.04.
-- The smoke test checks Qt and cloud imports without loading user settings or credentials.
 
 | Platform | Release asset |
 |---|---|

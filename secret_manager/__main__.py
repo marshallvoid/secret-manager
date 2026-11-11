@@ -4,8 +4,8 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from . import theme
-from .app import App
+from secret_manager import theme
+from secret_manager.app import App
 
 
 def main() -> None:

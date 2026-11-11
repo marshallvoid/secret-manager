@@ -3,11 +3,11 @@ repos:
     hooks:
       - id: ruff-check
         name: Ruff check
-        entry: uv run --no-env-file --locked --group dev --group build ruff check
+        entry: .venv/bin/python -m ruff check
         language: system
         types_or: [python, pyi]
       - id: ruff-format
         name: Ruff format check
-        entry: uv run --no-env-file --locked --group dev --group build ruff format --check
+        entry: .venv/bin/python -m ruff format --check
         language: system
         types_or: [python, pyi]
